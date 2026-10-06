@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0891b2">
+<title>Cap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root {
+  --day: #0891b2;
+  --day2: #22d3ee;
+  --bg: #f7f5f2;
+  --card: #ffffff;
+  --ink: #1c1b1a;
+  --muted: #6b6762;
+  --line: #e6e2dc;
+  --font-title: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-text: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141312;
+    --card: #1f1e1c;
+    --ink: #f2efea;
+    --muted: #a19c95;
+    --line: #34312e;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-text);
+  line-height: 1.5;
+}
+#app {
+  max-width: 540px;
+  margin: 0 auto;
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+input, textarea { font: inherit; font-size: 16px; color: inherit; }
+svg, .deco, .tick, .ico { pointer-events: none; }
+:focus-visible { outline: 3px solid var(--day); outline-offset: 2px; }
+
+/* En-tête : compte à rebours */
+.top { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 14px; }
+.pill {
+  font-family: var(--font-title); font-weight: 700; font-size: 15px;
+  padding: 5px 12px; border-radius: 99px; color: #fff;
+  background: linear-gradient(135deg, var(--day), var(--day2));
+}
+.pill small { font-family: var(--font-text); font-weight: 500; font-size: 13px; opacity: .9; }
+.dayname { font-family: var(--font-title); font-weight: 500; color: var(--muted); }
+
+/* Grande carte d'amorce */
+.hero {
+  position: relative; overflow: hidden; isolation: isolate;
+  min-height: calc(100vh - 190px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  border-radius: 28px; padding: 32px 24px; color: #fff; text-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: linear-gradient(160deg, var(--day), var(--day2));
+}
+.hero::before, .hero::after, .banner::after, .reward.on::after {
+  content: ""; position: absolute; z-index: -1; border-radius: 50%;
+  background: rgba(255,255,255,.14); pointer-events: none;
+}
+.hero::before { width: 260px; height: 260px; top: -90px; right: -80px; }
+.hero::after { width: 180px; height: 180px; bottom: -60px; left: -50px; }
+.hero-emoji { font-size: 54px; line-height: 1; }
+.hero-lieu { margin: 0; font-size: 15px; font-weight: 500; opacity: .9; }
+.hero-amorce { margin: 0 0 10px; font-family: var(--font-title); font-weight: 700; font-size: 28px; line-height: 1.2; max-width: 22ch; }
+.go {
+  width: 158px; height: 158px; border-radius: 50%; background: #fff; color: var(--day);
+  font-family: var(--font-title); font-weight: 700; font-size: 44px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.18); animation: pulse 2.2s ease-in-out infinite;
+}
+.go:active { transform: scale(.96); }
+.hero-contract { margin: 6px 0 0; font-size: 14px; opacity: .9; }
+.hero-text { margin: 0; font-size: 17px; max-width: 26ch; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 10px 30px rgba(0,0,0,.18), 0 0 0 0 rgba(255,255,255,.55); }
+  50% { box-shadow: 0 10px 30px rgba(0,0,0,.18), 0 0 0 18px rgba(255,255,255,0); }
+}
+
+/* Bandeau compact après l'amorce */
+.banner {
+  position: relative; overflow: hidden; isolation: isolate;
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 20px; color: #fff;
+  background: linear-gradient(135deg, var(--day), var(--day2)); margin-bottom: 18px;
+}
+.banner::after { width: 120px; height: 120px; right: -40px; top: -50px; }
+.banner-emoji { font-size: 30px; line-height: 1; }
+.banner p { margin: 0; }
+.banner-amorce { font-weight: 600; line-height: 1.3; }
+.banner-sub { font-size: 14px; opacity: .92; }
+.timer { font-family: var(--font-title); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Blocs et cases */
+.block { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 16px; margin-bottom: 14px; }
+.block-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.block-title { margin: 0; font-family: var(--font-title); font-weight: 700; font-size: 19px; }
+.count { font-family: var(--font-title); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin-bottom: 6px; }
+.bar > i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--day), var(--day2)); transition: width .3s; }
+.check { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 11px 2px; min-height: 48px; }
+.check + .check { border-top: 1px solid var(--line); }
+.box {
+  flex: none; width: 28px; height: 28px; border-radius: 9px; border: 2px solid var(--line);
+  display: grid; place-items: center; transition: background .15s, border-color .15s;
+}
+.tick { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.check.on .box { border-color: transparent; background: linear-gradient(135deg, var(--day), var(--day2)); }
+.check.on .tick { opacity: 1; }
+.check.on .lbl { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--day); }
+.lbl { line-height: 1.35; }
+.note { color: var(--muted); font-size: 15px; text-align: center; margin: 18px 8px; }
+.light .check + .check { border-top-color: rgba(255,255,255,.3); }
+.light .box { border-color: rgba(255,255,255,.7); }
+.light .check.on .box { background: #fff; }
+.light .check.on .tick { stroke: var(--day); }
+.light .check.on .lbl { color: #fff; text-decoration-color: #fff; }
+
+/* Récompense */
+.reward {
+  position: relative; overflow: hidden; isolation: isolate;
+  display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 20px; margin-bottom: 14px;
+  background: var(--card); border: 1px dashed var(--line);
+}
+.reward-emoji { font-size: 46px; line-height: 1; filter: grayscale(1); opacity: .35; }
+.reward-body { flex: 1; min-width: 0; }
+.reward-kicker { margin: 0 0 2px; font-size: 13px; color: var(--muted); }
+.reward-text { width: 100%; border: 0; background: transparent; padding: 2px 0; font-weight: 600; border-bottom: 1px dashed transparent; }
+.reward-text:focus { outline: none; border-bottom-color: currentColor; }
+.reward.on { border: 0; color: #fff; background: linear-gradient(135deg, var(--day), var(--day2)); }
+.reward.on::after { width: 140px; height: 140px; right: -40px; bottom: -70px; }
+.reward.on .reward-emoji { filter: none; opacity: 1; animation: bounce .9s ease both; }
+.reward.on .reward-kicker { color: rgba(255,255,255,.9); }
+@keyframes bounce {
+  0% { transform: scale(.4); } 45% { transform: scale(1.25); } 65% { transform: scale(.92); } 85% { transform: scale(1.05); } 100% { transform: scale(1); }
+}
+
+/* Déroulé */
+.link { color: var(--muted); font-size: 15px; padding: 10px 4px; width: 100%; text-align: left; }
+.timeline { list-style: none; margin: 0; padding: 0; }
+.timeline li { display: flex; gap: 14px; padding: 7px 0; }
+.timeline time { flex: none; width: 52px; font-family: var(--font-title); font-weight: 700; color: var(--day); font-variant-numeric: tabular-nums; }
+
+/* Pages RAPPORT / BOULOT / CAP */
+.page-title { margin: 6px 0 2px; font-family: var(--font-title); font-weight: 700; font-size: 30px; }
+.page-sub { margin: 0 0 16px; color: var(--muted); }
+.hint { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+.check.next .lbl { font-weight: 600; }
+.check.next .box { border-color: var(--day); }
+.field {
+  display: block; width: 100%; padding: 12px 14px; border-radius: 14px;
+  border: 1.5px solid var(--line); background: var(--bg); resize: vertical; line-height: 1.45;
+}
+.field:focus { outline: none; border-color: var(--day); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 18px;
+  border-radius: 99px; font-weight: 600; color: #fff; background: linear-gradient(135deg, var(--day), var(--day2));
+}
+.btn.ghost { color: var(--ink); background: transparent; border: 1.5px solid var(--line); }
+.btn:disabled { opacity: .6; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 10px; }
+.iv-form { display: grid; gap: 10px; }
+.iv-title { margin: 0 0 4px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; color: var(--day); border: 1px solid var(--day); vertical-align: 2px; margin-left: 4px; }
+.iv-list { margin: 0; padding: 0; list-style: none; counter-reset: q; }
+.iv-list li { counter-increment: q; padding: 12px 0; }
+.iv-list li + li { border-top: 1px solid var(--line); }
+.iv-q { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-weight: 600; }
+.iv-q > span:first-child::before { content: counter(q) ". "; color: var(--day); font-family: var(--font-title); }
+.iv-q > span:first-child { flex: 1; }
+.speak { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; }
+.speak .ico { font-size: 17px; }
+.counters { display: grid; gap: 12px; margin-bottom: 14px; }
+.counter {
+  position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: 20px; color: #fff; background: linear-gradient(135deg, var(--c1), var(--c2));
+}
+.counter-n { font-family: var(--font-title); font-weight: 700; font-size: 40px; line-height: 1; min-width: 1.4em; font-variant-numeric: tabular-nums; }
+.counter-l { font-weight: 600; line-height: 1.3; }
+.counter-btns { display: flex; gap: 8px; }
+.counter-btns button { min-width: 48px; height: 48px; border-radius: 99px; font-weight: 700; }
+.counter .plus { background: #fff; color: var(--c1); padding: 0 14px; font-size: 18px; }
+.counter .minus { background: rgba(255,255,255,.18); color: #fff; font-size: 14px; }
+
+.dayname small { font-family: var(--font-text); font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.chip {
+  min-height: 40px; padding: 8px 14px; border-radius: 99px; font-size: 14px; font-weight: 600;
+  border: 1.5px solid var(--c1); color: var(--ink); background: var(--card);
+}
+.chip.on { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--c1), var(--c2)); }
+.sets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.set { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); min-width: 0; }
+.set .field { color: var(--ink); font-weight: 500; padding: 10px 12px; min-height: 46px; -webkit-appearance: none; appearance: none; }
+.set:last-child { grid-column: 1 / -1; }
+.file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+label.btn { position: relative; cursor: pointer; }
+label.btn:focus-within { outline: 3px solid var(--day); outline-offset: 2px; }
+.msg { margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); font-size: 15px; white-space: pre-line; }
+.rule + .rule { border-top: 1px solid var(--line); }
+.rule-head { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 52px; text-align: left; font-weight: 600; }
+.chev { font-family: var(--font-title); font-size: 22px; color: var(--day); width: 24px; text-align: center; }
+.rule-body { margin: 0 0 12px; padding-left: 20px; color: var(--ink); }
+.rule-body li { margin: 4px 0; }
+.rule-body li::marker { color: var(--day); }
+
+/* Onglets */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; justify-content: center;
+  padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.tabs-in { display: flex; width: 100%; max-width: 540px; gap: 4px; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 14px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--muted); min-height: 52px; }
+.tab .ico { font-size: 20px; line-height: 1; }
+.tab.on { color: #fff; background: linear-gradient(135deg, var(--day), var(--day2)); }
+
+/* Erreur lisible */
+.oops { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+
+/* Confettis */
+.confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 50; }
+.confetti i { position: absolute; top: -16px; width: 8px; height: 13px; border-radius: 2px; animation: fall 1.9s cubic-bezier(.25,.6,.45,1) forwards; }
+@keyframes fall { to { transform: translate3d(var(--dx), 110vh, 0) rotate(var(--r)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .go, .reward.on .reward-emoji { animation: none; }
+}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<nav id="tabs" class="tabs" aria-label="Onglets"></nav>
+
+<script>
+/*CORE-START*/
+// Cœur de Cap : données, état, stockage. Aucun accès au DOM ici,
+// pour que les tests puissent l'exécuter hors navigateur.
+var Cap = (function () {
+  'use strict';
+
+  var STORAGE_KEY = 'cap_v1';
+  var TABS = ['jour', 'rapport', 'boulot', 'cap'];
+  var DAY_KEYS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'we'];
+  var AMORCE_SECONDS = 5 * 60;
+  var LEVER_STEP = 30;
+  var OLD_DATE = '2000-01-01';
+
+  // ---------- Contenu ----------
+
+  // Contenu d'exemple, neutre : c'est lui qui est publié.
+  // Le contenu personnel vit dans un fichier JSON de même forme (perso.json),
+  // importé depuis l'onglet Cap et gardé dans le navigateur ; il n'est jamais publié.
+  // Heures du déroulé : '=w' lever, '+90' lever + 90 min, '=c' fermeture, ou une heure fixe '14:30'.
+  var SAMPLE = {
+    version: 1,
+    settings: { lever: '08:00', leverMax: '10:30', fermeture: '22:30', finStage: '2026-12-18', rendu: '2027-01-15' },
+    countdown: { a: 'avant la bascule', b: 'avant l’échéance' },
+    days: {
+      lun: {
+        name: 'Lundi', emoji: '☕', c1: '#0891b2', c2: '#22d3ee',
+        lieu: 'Dehors, puis café',
+        amorce: 'Prépare ton sac et mets tes chaussures.',
+        essentiels: [
+          { id: 'lun-sortie', label: 'Sortir : une activité physique' },
+          { id: 'lun-admin', label: 'Tâche administrative (45 min, minuteur)' }
+        ],
+        bonus: [
+          { id: 'lun-cand', label: 'Une candidature' },
+          { id: 'lun-extra', label: 'Une petite tâche en plus' }
+        ],
+        reward: { emoji: '🎬', text: 'Une sortie' },
+        deroule: [['=w', 'Réveil'], ['+60', 'Sortie'], ['+180', 'Déjeuner'], ['14:30', 'Café : tâche administrative'], ['=c', 'Fermeture']]
+      },
+      mar: {
+        name: 'Mardi', emoji: '📘', c1: '#7c3aed', c2: '#c084fc',
+        lieu: 'Au bureau',
+        amorce: 'Ouvre le document à une section vide. Dicte 5 minutes.',
+        essentiels: [{ id: 'mar-session', label: 'Une session de 45 min' }],
+        bonus: [{ id: 'mar-poste', label: 'Ranger le poste de travail' }],
+        reward: { emoji: '🎧', text: 'Un épisode de ta série' },
+        deroule: [['=w', 'Réveil'], ['+120', 'Session'], ['+300', 'Déjeuner'], ['=c', 'Fermeture']]
+      },
+      mer: {
+        name: 'Mercredi', emoji: '🖥', c1: '#ea580c', c2: '#fbbf24',
+        lieu: 'Au bureau',
+        amorce: 'Relis à voix haute les 3 dernières lignes d’hier.',
+        essentiels: [
+          { id: 'mer-a', label: 'Session A' },
+          { id: 'mer-b', label: 'Session B' }
+        ],
+        bonus: [{ id: 'mer-projet', label: 'Une étape d’un projet perso' }],
+        reward: { emoji: '🎨', text: 'Ton activité créative préférée' },
+        deroule: [['=w', 'Réveil'], ['+90', 'Session A'], ['13:00', 'Déjeuner'], ['15:00', 'Session B'], ['=c', 'Fermeture']]
+      },
+      jeu: {
+        name: 'Jeudi', emoji: '🌿', c1: '#15803d', c2: '#4ade80',
+        lieu: 'Au bureau, puis retour',
+        amorce: 'Une session avant de partir. 45 minutes.',
+        essentiels: [
+          { id: 'jeu-session', label: 'Une session' },
+          { id: 'jeu-etapes', label: 'Noter les 3 prochaines étapes' }
+        ],
+        bonus: [],
+        reward: { emoji: '🎮', text: 'Jeu vidéo — rien d’exigeant' },
+        deroule: [['=w', 'Réveil'], ['+90', 'Session'], ['13:00', 'Déjeuner'], ['17:00', 'Chez toi. Rien de prévu.']]
+      },
+      ven: {
+        name: 'Vendredi', emoji: '🎈', c1: '#be185d', c2: '#fb7185',
+        lieu: 'Café',
+        amorce: 'Lis à voix haute ce que tu as écrit cette semaine.',
+        essentiels: [
+          { id: 'ven-relecture', label: 'Relecture à voix haute' },
+          { id: 'ven-cand', label: 'Une candidature' }
+        ],
+        bonus: [
+          { id: 'ven-relance', label: 'Relancer ce qui a +10 jours' },
+          { id: 'ven-bilan', label: 'Bilan 3 lignes' }
+        ],
+        reward: { emoji: '🍿', text: 'Ciné ou sortie' },
+        deroule: [['=w', 'Réveil'], ['+90', 'Café : relecture'], ['14:00', 'Candidatures'], ['=c', 'Fermeture']]
+      },
+      we: {
+        name: 'Week-end', emoji: '🌤', c1: '#ca8a04', c2: '#fde047',
+        weekend: { id: 'we-lever', label: 'Lever vers [heure], samedi et dimanche' }
+      }
+    },
+    prep: [
+      { id: 'prep-doc', label: 'Préparer le document de travail, sections vides' },
+      { id: 'prep-fichiers', label: 'Ranger les fichiers utiles au bon endroit' },
+      { id: 'prep-consignes', label: 'Vérifier les consignes et la date exacte' },
+      { id: 'prep-essai', label: 'Un essai de 20 min, rien à rédiger' },
+      { id: 'prep-semaine', label: 'Préparer la première semaine type' }
+    ],
+    prepNote: 'Le reste de tes soirées : rien.',
+    prepDone: 'Dès la bascule, on démarre. D’ici là : rien.',
+    jobs: [
+      { id: 'j1', label: 'CV à jour' },
+      { id: 'j2', label: 'Profil en ligne à jour' },
+      { id: 'j3', label: 'Lettre type : 3 paragraphes, un seul à réécrire' },
+      { id: 'j4', label: '30 cibles dans un tableau de suivi' },
+      { id: 'j5', label: 'Une seule piste prioritaire, pas plus' }
+    ],
+    jobsIntro: 'Une candidature envoyée, un +1.',
+    counters: [
+      { id: 'c1', label: 'Candidatures', c1: '#1d4ed8', c2: '#60a5fa' },
+      { id: 'c2', label: 'Candidatures (piste 2)', c1: '#dc2626', c2: '#fb923c' },
+      { id: 'relances', label: 'Relances', c1: '#6d28d9', c2: '#c084fc' }
+    ],
+    rules: [
+      { id: 'rythme', title: '😴 Rythme', text: [
+        'Le jour de la bascule, la contrainte externe s’arrête d’un coup.',
+        'Reculer le lever par paliers de 30 min par semaine.',
+        'Chaque matin, une raison de sortir.',
+        'Fermeture à heure fixe.',
+        'Le week-end aussi : c’est là que la dérive se fabrique.'
+      ] },
+      { id: 'redaction', title: '✍️ Rédaction', text: [
+        'Tu ne rédiges pas, tu réponds à des questions.',
+        'Premier passage en style moche, interdiction de bien écrire.',
+        'Bien écrire, c’est le passage 2, et c’est un autre jour.'
+      ] },
+      { id: 'pause', title: '⏸ En pause', text: [
+        'Ce qui n’a pas de date limite attend, avec une date de reprise.',
+        'Trois chantiers actifs au maximum.'
+      ] }
+    ]
+  };
+
+  // Contenu actif (exemple ou contenu importé). Remplacé par setContent().
+  var CONTENT, DAYS, PREP, JOBS, COUNTERS, RULES;
+
+  // Contenu fixe, non personnel.
+  var RAPPORT = [
+    { id: 'r1', label: 'Plan recopié, sections vides' },
+    { id: 'r2', label: 'Captures réparties' },
+    { id: 'r3', label: 'Sections factuelles en télégraphique' },
+    { id: 'r4', label: 'Sections d’analyse en télégraphique' },
+    { id: 'r5', label: 'Intro + conclusion (en dernier)' },
+    { id: 'r6', label: 'Passage 2 : transformer en phrases' },
+    { id: 'r7', label: 'Annexes' },
+    { id: 'r8', label: 'Relecture à voix haute' },
+    { id: 'r9', label: 'Mise en page, envoyé ✉️' }
+  ];
+
+  // Interview : banque statique, correspondance par mots-clés (début de mot, sans accents).
+  // L'ordre compte : la première catégorie qui correspond gagne.
+  var INTERVIEW = [
+    { id: 'remerciements', label: 'Remerciements', keys: ['remerci', 'merci'], questions: [
+      'Qui était là le premier jour pour t’accueillir ?',
+      'Qui t’a appris le plus de choses ?',
+      'Qui répondait à tes questions au quotidien ?',
+      'Qui relisait ou validait ton travail ?',
+      'À l’école, qui faut-il remercier (tuteur, référent) ?',
+      'Une équipe ou un service entier qui a facilité ton travail ?',
+      'Un moment où quelqu’un a fait une vraie différence pour toi ?'
+    ] },
+    { id: 'conclusion', label: 'Conclusion', keys: ['conclu', 'bilan', 'synthese', 'perspective', 'avenir'], questions: [
+      'Ce stage en trois phrases, tu dirais quoi ?',
+      'La première chose que tu retiens ?',
+      'Ça a confirmé ou changé ton projet ? Comment ?',
+      'Ce qui t’a le plus plu ?',
+      'Ce qui t’a le moins plu ?',
+      'Un conseil pour la personne qui fera ce stage après toi ?',
+      'Et maintenant, la suite logique, c’est quoi ?'
+    ] },
+    { id: 'competences', label: 'Compétences', keys: ['competence', 'apprentissage', 'acquis', 'savoir', 'apport', 'appris'], questions: [
+      'Qu’est-ce que tu sais faire maintenant, que tu ne savais pas avant ?',
+      'Un outil que tu maîtrises mieux qu’à ton arrivée ?',
+      'Une situation où tu as dû t’adapter ?',
+      'Qu’est-ce qu’on t’a dit que tu faisais bien ?',
+      'Un cours de l’école qui t’a servi pour de vrai ?',
+      'Ce qui te manquait au début ?',
+      'Quelle compétence tu mettrais en premier sur ton CV ?'
+    ] },
+    { id: 'analyse', label: 'Analyse', keys: ['analys', 'problemati', 'probleme', 'enjeu', 'difficulte', 'critique', 'recul', 'reflexion'], questions: [
+      'Quel problème revenait sans cesse ?',
+      'Qui était gêné par ce problème, et comment ?',
+      'Qu’est-ce qui avait déjà été essayé avant toi ?',
+      'Qu’est-ce que tu as proposé ou testé ?',
+      'Qu’est-ce qui a marché, qu’est-ce qui n’a pas marché ?',
+      'Si tu recommençais demain, tu changerais quoi ?',
+      'Un chiffre ou un fait qui montre le résultat ?'
+    ] },
+    { id: 'missions', label: 'Missions', keys: ['mission', 'tache', 'activite', 'role', 'realisation', 'travaux'], questions: [
+      'Ta mission principale, en une phrase ?',
+      'Une journée type : tu faisais quoi, dans l’ordre ?',
+      'Quelle tâche revenait le plus souvent ?',
+      'Un livrable que tu montrerais en premier ?',
+      'Avec qui tu travaillais sur cette mission ?',
+      'Quel outil ou quelle méthode tu as utilisé ?',
+      'Qu’est-ce qui était terminé à ton départ, et qu’est-ce qui ne l’était pas ?'
+    ] },
+    { id: 'presentation', label: 'Présentation', keys: ['presentation', 'structure', 'entreprise', 'organisation', 'societe', 'contexte', 'service', 'equipe'], questions: [
+      'L’entreprise fait quoi, en une phrase pour quelqu’un qui ne connaît pas ?',
+      'Combien de personnes, et dans quel service tu étais ?',
+      'Qui sont ses clients ou ses usagers ?',
+      'À qui tu rendais compte, qui t’encadrait ?',
+      'Ton poste de travail, il était où, à côté de qui ?',
+      'Quels outils tout le monde utilisait tous les jours ?',
+      'Qu’est-ce qui la rend différente des autres structures du même secteur ?'
+    ] }
+  ];
+  var INTERVIEW_GENERIC = {
+    id: 'generique', label: 'Questions générales', keys: [], questions: [
+      'Tu faisais quoi en arrivant le matin ?',
+      'Qui te donnait le travail ?',
+      'Le premier truc qu’on t’a demandé ?',
+      'Qu’est-ce que tu as produit qui existe encore ?',
+      'Quel moment t’a fait comprendre comment ça marchait ?',
+      'Qu’est-ce qui t’a surpris ?',
+      'Ce stage en trois phrases, tu dirais quoi ?'
+    ]
+  };
+
+  // ---------- Petits utilitaires ----------
+
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  function toBool(v) {
+    return v === true || v === 1 || v === '1' || v === 'true' || v === 'on' || v === 'oui';
+  }
+  function toInt(v, def, min, max) {
+    var n = typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+    if (!isFinite(n)) return def;
+    n = Math.round(n);
+    if (min !== undefined && n < min) n = min;
+    if (max !== undefined && n > max) n = max;
+    return n;
+  }
+  function toStr(v, def, maxLen) {
+    if (typeof v !== 'string') return def;
+    return maxLen ? v.slice(0, maxLen) : v;
+  }
+  function minutesToTime(m) {
+    m = ((Math.round(m) % 1440) + 1440) % 1440;
+    return pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+  }
+  function timeToMinutes(t) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(t);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+  }
+  // Accepte '07:30', '7:30', '7h30', '7h', ou un nombre de minutes (format hérité).
+  function toTime(v, def) {
+    if (typeof v === 'number' && isFinite(v) && v >= 0 && v < 1440) return minutesToTime(v);
+    if (typeof v !== 'string') return def;
+    var m = /^\s*(\d{1,2})\s*[:h]\s*(\d{2})?\s*$/i.exec(v);
+    if (!m) return def;
+    var h = Number(m[1]), mi = m[2] ? Number(m[2]) : 0;
+    if (h > 23 || mi > 59) return def;
+    return pad(h) + ':' + pad(mi);
+  }
+  function parseDate(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!m) return null;
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return d.getMonth() === Number(m[2]) - 1 ? d : null;
+  }
+  function dateToStr(d) {
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  function toDate(v, def) {
+    return typeof v === 'string' && parseDate(v) ? v : def;
+  }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- État ----------
+
+  function dayItemIds(k) {
+    var d = DAYS[k], ids = [];
+    d.essentiels.forEach(function (it) { ids.push(it.id); });
+    d.bonus.forEach(function (it) { ids.push(it.id); });
+    if (d.weekend) ids.push(d.weekend.id);
+    return ids;
+  }
+  function ids(list) { return list.map(function (it) { return it.id; }); }
+
+  function emptyDay() {
+    return { amorce: 'idle', startedAt: 0, checks: {}, anchors: { lever: false, fermeture: false } };
+  }
+
+  function defaults() {
+    var week = {}, rewards = {};
+    DAY_KEYS.forEach(function (k) {
+      week[k] = emptyDay();
+      rewards[k] = DAYS[k].reward ? DAYS[k].reward.text : '';
+    });
+    var counters = {};
+    COUNTERS.forEach(function (c) { counters[c.id] = 0; });
+    return {
+      v: 1,
+      tab: 'jour',
+      selectedDay: null,           // null = le jour réel
+      settings: {                  // valeurs par défaut : celles du contenu actif
+        lever: CONTENT.settings.lever,
+        leverMax: CONTENT.settings.leverMax,
+        fermeture: CONTENT.settings.fermeture,
+        finStage: CONTENT.settings.finStage,
+        rendu: CONTENT.settings.rendu,
+        phase: 'auto'              // 'auto' | 'A' | 'B'
+      },
+      week: week,
+      rewards: rewards,
+      prep: {},                    // { id: 'AAAA-MM-JJ' } date où la case a été cochée
+      prepAmorce: { date: '', amorce: 'idle', startedAt: 0 },  // amorce du soir, phase A
+      rapport: {},
+      jobs: {},
+      counters: counters,
+      interview: { title: '', answers: ['', '', '', '', '', '', ''] },
+      openRule: '',
+      weeksClosed: 0
+    };
+  }
+
+  // Carte de cases cochées : n'accepte que les identifiants connus.
+  // Tolère un tableau d'identifiants (format hérité) ou un objet {id: bool}.
+  function checkMap(v, known) {
+    var out = {};
+    if (Array.isArray(v)) {
+      v.forEach(function (id) { if (typeof id === 'string' && known.indexOf(id) >= 0) out[id] = true; });
+    } else if (isObj(v)) {
+      known.forEach(function (id) { if (has(v, id) && toBool(v[id])) out[id] = true; });
+    }
+    return out;
+  }
+
+  // Recopie amorce + startedAt depuis v vers out, en vérifiant les types.
+  function normAmorce(v, out) {
+    var a = v.amorce;
+    if (a === true || a === 'done') out.amorce = 'done';
+    else if (a === 'running') out.amorce = 'running';
+    var t = toInt(v.startedAt, 0, 0);
+    out.startedAt = t;
+    if (out.amorce === 'running' && !t) out.amorce = 'idle';
+  }
+
+  function normDay(v, k) {
+    var out = emptyDay();
+    if (v === true) { out.amorce = 'done'; return out; }
+    if (!isObj(v)) return out;
+    normAmorce(v, out);
+    out.checks = checkMap(v.checks, dayItemIds(k));
+    if (isObj(v.anchors)) {
+      out.anchors.lever = toBool(v.anchors.lever);
+      out.anchors.fermeture = toBool(v.anchors.fermeture);
+    }
+    return out;
+  }
+
+  // Reconstruit l'état clé par clé depuis les valeurs par défaut.
+  // Ne fait jamais confiance à la forme de `raw`.
+  function normalize(raw) {
+    var src = isObj(raw) ? raw : {};
+    var out = defaults();
+
+    out.tab = TABS.indexOf(src.tab) >= 0 ? src.tab : 'jour';
+    out.selectedDay = DAY_KEYS.indexOf(src.selectedDay) >= 0 ? src.selectedDay : null;
+
+    // Réglages : sous `settings`, ou à plat à la racine (format hérité).
+    var s = isObj(src.settings) ? src.settings : src;
+    var d = out.settings;
+    d.leverMax = toTime(s.leverMax, d.leverMax);
+    d.lever = toTime(has(s, 'lever') ? s.lever : s.wake, d.lever);
+    if (timeToMinutes(d.lever) > timeToMinutes(d.leverMax)) d.lever = d.leverMax;
+    d.fermeture = toTime(has(s, 'fermeture') ? s.fermeture : s.close, d.fermeture);
+    d.finStage = toDate(has(s, 'finStage') ? s.finStage : s.fin, d.finStage);
+    d.rendu = toDate(s.rendu, d.rendu);
+    d.phase = ['auto', 'A', 'B'].indexOf(s.phase) >= 0 ? s.phase : 'auto';
+
+    var wk = isObj(src.week) ? src.week : {};
+    DAY_KEYS.forEach(function (k) { out.week[k] = normDay(wk[k], k); });
+    // Format hérité : cases à plat { "lun:<id>": true }.
+    if (isObj(src.checks)) {
+      Object.keys(src.checks).forEach(function (key) {
+        var p = key.split(':');
+        if (p.length === 2 && DAY_KEYS.indexOf(p[0]) >= 0 &&
+            dayItemIds(p[0]).indexOf(p[1]) >= 0 && toBool(src.checks[key])) {
+          out.week[p[0]].checks[p[1]] = true;
+        }
+      });
+    }
+
+    if (isObj(src.rewards)) {
+      DAY_KEYS.forEach(function (k) {
+        if (DAYS[k].reward) out.rewards[k] = toStr(src.rewards[k], out.rewards[k], 120);
+      });
+    }
+
+    // Préparation : { id: date }. Une case cochée sans date (format hérité) prend une date ancienne.
+    var prepIds = ids(PREP);
+    if (Array.isArray(src.prep)) {
+      src.prep.forEach(function (id) { if (prepIds.indexOf(id) >= 0) out.prep[id] = OLD_DATE; });
+    } else if (isObj(src.prep)) {
+      prepIds.forEach(function (id) {
+        var v = src.prep[id];
+        if (typeof v === 'string' && parseDate(v)) out.prep[id] = v;
+        else if (toBool(v)) out.prep[id] = OLD_DATE;
+      });
+    }
+    if (isObj(src.prepAmorce)) {
+      out.prepAmorce.date = toDate(src.prepAmorce.date, '');
+      normAmorce(src.prepAmorce, out.prepAmorce);
+    }
+    out.rapport = checkMap(src.rapport, ids(RAPPORT));
+    out.jobs = checkMap(src.jobs, ids(JOBS));
+
+    if (isObj(src.counters)) {
+      COUNTERS.forEach(function (c) { out.counters[c.id] = toInt(src.counters[c.id], 0, 0, 9999); });
+    }
+
+    if (isObj(src.interview)) {
+      out.interview.title = toStr(src.interview.title, '', 200);
+      if (Array.isArray(src.interview.answers)) {
+        for (var i = 0; i < 7; i++) out.interview.answers[i] = toStr(src.interview.answers[i], '', 5000);
+      }
+    }
+
+    out.openRule = RULES.some(function (r) { return r.id === src.openRule; }) ? src.openRule : '';
+    out.weeksClosed = toInt(src.weeksClosed, 0, 0, 999);
+    return out;
+  }
+
+  // ---------- Stockage ----------
+
+  function defaultStorage() {
+    try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (e) { return null; }
+  }
+
+  // Renvoie toujours un état valide, même si le stockage est vide, refusé ou corrompu.
+  function load(storage) {
+    var st = storage === undefined ? defaultStorage() : storage;
+    var raw = null;
+    try { raw = st ? st.getItem(STORAGE_KEY) : null; } catch (e) { raw = null; }
+    var parsed = null;
+    if (typeof raw === 'string') {
+      try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+    }
+    return normalize(parsed);
+  }
+
+  // Renvoie true si l'écriture a réussi.
+  function save(state, storage) {
+    var st = storage === undefined ? defaultStorage() : storage;
+    if (!st) return false;
+    try { st.setItem(STORAGE_KEY, JSON.stringify(state)); return true; } catch (e) { return false; }
+  }
+
+  // ---------- Contenu importé ----------
+
+  var CONTENT_KEY = 'cap_v1_contenu';
+  var ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+  var COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+  var TOKEN_RE = /^(=w|=c|\+\d{1,3}|\d{2}:\d{2})$/;
+
+  // Reconstruit un contenu valide depuis n'importe quoi : chaque champ absent ou invalide
+  // reprend la valeur d'exemple. Renvoie { content, warnings }.
+  function normalizeContent(raw) {
+    var w = [];
+    var src = isObj(raw) ? raw : {};
+    if (!isObj(raw)) w.push('Contenu illisible : contenu d’exemple utilisé.');
+    var seen = {};
+
+    function str(v, def, max) { return typeof v === 'string' ? v.slice(0, max) : def; }
+    function color(v, def) { return typeof v === 'string' && COLOR_RE.test(v) ? v : def; }
+    function items(v, def, max, where) {
+      if (v === undefined) v = def;
+      else if (!Array.isArray(v)) { w.push(where + ' : une liste est attendue.'); v = def; }
+      var out = [];
+      v.forEach(function (it) {
+        if (!isObj(it) || typeof it.id !== 'string' || !ID_RE.test(it.id) || typeof it.label !== 'string' || !it.label.trim()) {
+          w.push(where + ' : un élément mal formé est ignoré.'); return;
+        }
+        if (seen[it.id]) { w.push(where + ' : identifiant en double « ' + it.id + ' » ignoré.'); return; }
+        seen[it.id] = true;
+        out.push({ id: it.id, label: it.label.slice(0, 200) });
+      });
+      if (max && out.length > max) { w.push(where + ' : ' + max + ' au maximum, le reste est ignoré.'); out = out.slice(0, max); }
+      return out;
+    }
+    function deroule(v, def, where) {
+      if (v === undefined) return def.slice();
+      if (!Array.isArray(v)) { w.push(where + ' : une liste est attendue.'); return def.slice(); }
+      return v.filter(function (r) {
+        var ok = Array.isArray(r) && typeof r[0] === 'string' && TOKEN_RE.test(r[0]) &&
+          (r[0].indexOf(':') < 0 || toTime(r[0], '') === r[0]) && typeof r[1] === 'string';
+        if (!ok) w.push(where + ' : une ligne mal formée est ignorée.');
+        return ok;
+      }).map(function (r) { return [r[0], r[1].slice(0, 120)]; });
+    }
+
+    var s = isObj(src.settings) ? src.settings : {};
+    var settings = {
+      lever: toTime(s.lever, SAMPLE.settings.lever),
+      leverMax: toTime(s.leverMax, SAMPLE.settings.leverMax),
+      fermeture: toTime(s.fermeture, SAMPLE.settings.fermeture),
+      finStage: toDate(s.finStage, SAMPLE.settings.finStage),
+      rendu: toDate(s.rendu, SAMPLE.settings.rendu)
+    };
+    if (timeToMinutes(settings.lever) > timeToMinutes(settings.leverMax)) settings.lever = settings.leverMax;
+
+    var cd = isObj(src.countdown) ? src.countdown : {};
+    var srcDays = isObj(src.days) ? src.days : {};
+    var days = {};
+    DAY_KEYS.forEach(function (k) {
+      var base = SAMPLE.days[k], d = isObj(srcDays[k]) ? srcDays[k] : {};
+      var name = str(d.name, base.name, 30);
+      var day = {
+        name: name, emoji: str(d.emoji, base.emoji, 8),
+        c1: color(d.c1, base.c1), c2: color(d.c2, base.c2),
+        lieu: k === 'we' ? '' : str(d.lieu, base.lieu, 80),
+        amorce: k === 'we' ? '' : str(d.amorce, base.amorce, 160),
+        essentiels: k === 'we' ? [] : items(d.essentiels, base.essentiels, 2, name + ', essentiels'),
+        bonus: k === 'we' ? [] : items(d.bonus, base.bonus, 6, name + ', bonus'),
+        reward: null,
+        deroule: k === 'we' ? [] : deroule(d.deroule, base.deroule, name + ', déroulé')
+      };
+      if (k === 'we') {
+        var we = items(d.weekend !== undefined ? [d.weekend] : undefined, [base.weekend], 1, 'Week-end');
+        day.weekend = we[0] || { id: 'we-lever', label: base.weekend.label };
+      } else {
+        var r = isObj(d.reward) ? d.reward : {};
+        day.reward = { emoji: str(r.emoji, base.reward.emoji, 8), text: str(r.text, base.reward.text, 120) };
+      }
+      days[k] = day;
+    });
+
+    var counters = (Array.isArray(src.counters) ? src.counters : SAMPLE.counters).filter(function (c) {
+      var ok = isObj(c) && typeof c.id === 'string' && ID_RE.test(c.id) && !seen[c.id] && typeof c.label === 'string';
+      if (!ok) w.push('Compteurs : un élément mal formé est ignoré.');
+      else seen[c.id] = true;
+      return ok;
+    }).slice(0, 6).map(function (c, i) {
+      var base = SAMPLE.counters[i % SAMPLE.counters.length];
+      return { id: c.id, label: c.label.slice(0, 60), c1: color(c.c1, base.c1), c2: color(c.c2, base.c2) };
+    });
+
+    var rules = (Array.isArray(src.rules) ? src.rules : SAMPLE.rules).filter(function (r) {
+      var ok = isObj(r) && typeof r.id === 'string' && ID_RE.test(r.id) && !seen[r.id] &&
+        typeof r.title === 'string' && Array.isArray(r.text);
+      if (!ok) w.push('Règles : un élément mal formé est ignoré.');
+      else seen[r.id] = true;
+      return ok;
+    }).map(function (r) {
+      return { id: r.id, title: r.title.slice(0, 80), text: r.text.filter(function (t) { return typeof t === 'string'; }).map(function (t) { return t.slice(0, 300); }) };
+    });
+
+    return {
+      content: {
+        version: 1, settings: settings,
+        countdown: { a: str(cd.a, SAMPLE.countdown.a, 60), b: str(cd.b, SAMPLE.countdown.b, 60) },
+        days: days,
+        prep: items(src.prep, SAMPLE.prep, 30, 'Préparation'),
+        prepNote: str(src.prepNote, SAMPLE.prepNote, 200),
+        prepDone: str(src.prepDone, SAMPLE.prepDone, 200),
+        jobs: items(src.jobs, SAMPLE.jobs, 20, 'Outils'),
+        jobsIntro: str(src.jobsIntro, SAMPLE.jobsIntro, 200),
+        counters: counters,
+        rules: rules
+      },
+      warnings: w
+    };
+  }
+
+  function setContent(c) {
+    CONTENT = c;
+    DAYS = c.days; PREP = c.prep; JOBS = c.jobs; COUNTERS = c.counters; RULES = c.rules;
+  }
+
+  // Lit un fichier importé (texte). Renvoie { ok, content, warnings } ou { ok: false, error }.
+  function parseContentText(text) {
+    var obj;
+    try { obj = JSON.parse(String(text)); } catch (e) { return { ok: false, error: 'Ce fichier n’est pas un JSON valide.' }; }
+    if (!isObj(obj) || !isObj(obj.days)) return { ok: false, error: 'Ce fichier ne ressemble pas à un contenu Cap (il manque « days »).' };
+    var r = normalizeContent(obj);
+    return { ok: true, content: r.content, warnings: r.warnings };
+  }
+
+  // Contenu enregistré dans ce navigateur, ou l'exemple. Ne lève jamais d'exception.
+  function loadContent(storage) {
+    var st = storage === undefined ? defaultStorage() : storage;
+    var raw = null, parsed = null;
+    try { raw = st ? st.getItem(CONTENT_KEY) : null; } catch (e) { raw = null; }
+    if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch (e) { parsed = null; } }
+    if (isObj(parsed) && isObj(parsed.content) && isObj(parsed.content.days)) {
+      return { content: normalizeContent(parsed.content).content, source: 'perso', importedAt: toDate(parsed.importedAt, '') };
+    }
+    return { content: normalizeContent(SAMPLE).content, source: 'exemple', importedAt: '' };
+  }
+  function saveContent(content, today, storage) {
+    var st = storage === undefined ? defaultStorage() : storage;
+    if (!st) return false;
+    try { st.setItem(CONTENT_KEY, JSON.stringify({ importedAt: dateToStr(today), content: content })); return true; } catch (e) { return false; }
+  }
+  function clearContent(storage) {
+    var st = storage === undefined ? defaultStorage() : storage;
+    try { if (st) st.removeItem(CONTENT_KEY); } catch (e) { /* rien */ }
+  }
+  // Après un import : les réglages et les récompenses du contenu remplacent ceux de l'état
+  // (la phase manuelle, les cases et les compteurs sont gardés).
+  function applyContentSettings(state) {
+    var c = CONTENT.settings;
+    ['lever', 'leverMax', 'fermeture', 'finStage', 'rendu'].forEach(function (k) { state.settings[k] = c[k]; });
+    DAY_KEYS.forEach(function (k) { state.rewards[k] = DAYS[k].reward ? DAYS[k].reward.text : ''; });
+    return state;
+  }
+
+  // ---------- Dates, phases, horaires ----------
+
+  function dayKeyForDate(date) {
+    return ['we', 'lun', 'mar', 'mer', 'jeu', 'ven', 'we'][date.getDay()];
+  }
+  function activeDay(state, today) {
+    return state.selectedDay || dayKeyForDate(today);
+  }
+  function daysUntil(dateStr, today) {
+    var target = parseDate(dateStr);
+    if (!target) return 0;
+    var t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return Math.round((target - t0) / 86400000);
+  }
+  // Phase A jusqu'à la date de bascule incluse, B ensuite.
+  function phaseFor(state, today) {
+    var p = state.settings.phase;
+    if (p === 'A' || p === 'B') return p;
+    return daysUntil(state.settings.finStage, today) >= 0 ? 'A' : 'B';
+  }
+  function countdown(state, today) {
+    return phaseFor(state, today) === 'A'
+      ? { days: daysUntil(state.settings.finStage, today), label: CONTENT.countdown.a }
+      : { days: daysUntil(state.settings.rendu, today), label: CONTENT.countdown.b };
+  }
+  function resolveTime(t, settings) {
+    if (t === '=w') return settings.lever;
+    if (t === '=c') return settings.fermeture;
+    if (/^\+\d+$/.test(t)) return minutesToTime(timeToMinutes(settings.lever) + Number(t.slice(1)));
+    return t;
+  }
+  function deroule(k, settings) {
+    return DAYS[k].deroule.map(function (row) {
+      return { time: resolveTime(row[0], settings), label: row[1] };
+    });
+  }
+  function fillHeure(text, settings) {
+    return text.replace(/\[heure\]/g, settings.lever.replace(':', 'h'));
+  }
+
+  // ---------- Actions ----------
+
+  function essentialsDone(state, k) {
+    var ess = DAYS[k].essentiels;
+    if (!ess.length) return false;
+    var c = state.week[k].checks;
+    return ess.every(function (it) { return c[it.id] === true; });
+  }
+  function rewardUnlocked(state, k) {
+    return !!DAYS[k].reward && essentialsDone(state, k);
+  }
+  function toggleDayCheck(state, k, id) {
+    if (dayItemIds(k).indexOf(id) < 0) return state;
+    var c = state.week[k].checks;
+    if (c[id]) delete c[id]; else c[id] = true;
+    return state;
+  }
+  function toggleIn(map, known, id) {
+    if (known.indexOf(id) < 0) return;
+    if (map[id]) delete map[id]; else map[id] = true;
+  }
+  function togglePrep(state, id, today) {
+    if (ids(PREP).indexOf(id) < 0) return state;
+    if (state.prep[id]) delete state.prep[id]; else state.prep[id] = dateToStr(today);
+    return state;
+  }
+  function nextPrep(state) {
+    for (var i = 0; i < PREP.length; i++) if (!state.prep[PREP[i].id]) return PREP[i];
+    return null;
+  }
+  // La tâche de préparation cochée ce soir, s'il y en a une (une par soir maximum).
+  function prepDoneToday(state, today) {
+    var t = dateToStr(today);
+    for (var i = 0; i < PREP.length; i++) if (state.prep[PREP[i].id] === t) return PREP[i];
+    return null;
+  }
+
+  // Amorces : k est un jour ('lun'…) ou 'prep' (amorce du soir en phase A, remise à zéro chaque jour).
+  function slotFor(state, k, now) {
+    if (k !== 'prep') return state.week[k];
+    var t = dateToStr(new Date(now));
+    return state.prepAmorce.date === t ? state.prepAmorce : { date: t, amorce: 'idle', startedAt: 0 };
+  }
+  function amorceStatus(state, k, now) { return slotFor(state, k, now).amorce; }
+  function startAmorce(state, k, now) {
+    var s = slotFor(state, k, now);
+    if (s.amorce === 'idle') { s.amorce = 'running'; s.startedAt = now; }
+    if (k === 'prep') state.prepAmorce = s;
+    return state;
+  }
+  // Secondes restantes du chrono (0 si fini ou non lancé).
+  function amorceRemaining(state, k, now) {
+    var s = slotFor(state, k, now);
+    if (s.amorce !== 'running') return 0;
+    return Math.max(0, AMORCE_SECONDS - Math.floor((now - s.startedAt) / 1000));
+  }
+  function finishAmorce(state, k, now) {
+    var s = slotFor(state, k, now);
+    s.amorce = 'done';
+    if (k === 'prep') state.prepAmorce = s;
+    return state;
+  }
+  // Termine en silence les chronos expirés (par exemple après une nuit). Renvoie true si quelque chose a changé.
+  function expireAmorces(state, now) {
+    var changed = false;
+    DAY_KEYS.concat(['prep']).forEach(function (k) {
+      var s = k === 'prep' ? state.prepAmorce : state.week[k];
+      if (s.amorce === 'running' && now - s.startedAt >= AMORCE_SECONDS * 1000) { s.amorce = 'done'; changed = true; }
+    });
+    return changed;
+  }
+  function toggleAnchor(state, k, which) {
+    if (DAY_KEYS.indexOf(k) < 0 || (which !== 'lever' && which !== 'fermeture')) return state;
+    state.week[k].anchors[which] = !state.week[k].anchors[which];
+    return state;
+  }
+  // Modifie un réglage après vérification. Renvoie false si la valeur est refusée.
+  function setSetting(state, key, value) {
+    var s = state.settings, t;
+    if (key === 'lever' || key === 'fermeture') {
+      t = toTime(value, '');
+      if (!t) return false;
+      if (key === 'lever' && timeToMinutes(t) > timeToMinutes(s.leverMax)) t = s.leverMax;
+      s[key] = t;
+      return true;
+    }
+    if (key === 'finStage' || key === 'rendu') {
+      if (typeof value !== 'string' || !parseDate(value)) return false;
+      s[key] = value;
+      return true;
+    }
+    if (key === 'phase') {
+      if (['auto', 'A', 'B'].indexOf(value) < 0) return false;
+      s.phase = value;
+      return true;
+    }
+    return false;
+  }
+  function selectDay(state, k) {
+    state.selectedDay = DAY_KEYS.indexOf(k) >= 0 ? k : null;
+    return state;
+  }
+  function bumpCounter(state, id, delta) {
+    if (has(state.counters, id)) state.counters[id] = Math.max(0, Math.min(9999, state.counters[id] + delta));
+    return state;
+  }
+  // Clore la semaine : décoche la semaine, lever +30 min (plafonné), garde le reste.
+  function closeWeek(state) {
+    DAY_KEYS.forEach(function (k) { state.week[k] = emptyDay(); });
+    var s = state.settings;
+    s.lever = minutesToTime(Math.min(timeToMinutes(s.lever) + LEVER_STEP, timeToMinutes(s.leverMax)));
+    state.weeksClosed += 1;
+    return state;
+  }
+
+  // ---------- Interview ----------
+
+  function simplify(text) {
+    return String(text == null ? '' : text).toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+  function interviewFor(title) {
+    var words = simplify(title).split(/[^a-z0-9]+/).filter(Boolean);
+    for (var i = 0; i < INTERVIEW.length; i++) {
+      var cat = INTERVIEW[i];
+      var hit = words.some(function (w) {
+        return cat.keys.some(function (key) { return w.indexOf(key) === 0; });
+      });
+      if (hit) return cat;
+    }
+    return INTERVIEW_GENERIC;
+  }
+  function interviewText(title, answers) {
+    var cat = interviewFor(title);
+    var lines = [String(title || '').trim() || 'Section', ''];
+    cat.questions.forEach(function (q, i) {
+      lines.push(q);
+      lines.push(String((answers && answers[i]) || '').trim() || '…');
+      lines.push('');
+    });
+    return lines.join('\n').trim() + '\n';
+  }
+
+  setContent(normalizeContent(SAMPLE).content);
+
+  return {
+    STORAGE_KEY: STORAGE_KEY, CONTENT_KEY: CONTENT_KEY, TABS: TABS, DAY_KEYS: DAY_KEYS, AMORCE_SECONDS: AMORCE_SECONDS,
+    RAPPORT: RAPPORT, INTERVIEW: INTERVIEW, INTERVIEW_GENERIC: INTERVIEW_GENERIC, SAMPLE: SAMPLE,
+    // Contenu actif : lu à chaque accès, pour suivre setContent().
+    get CONTENT() { return CONTENT; },
+    get DAYS() { return DAYS; },
+    get PREP() { return PREP; },
+    get JOBS() { return JOBS; },
+    get COUNTERS() { return COUNTERS; },
+    get RULES() { return RULES; },
+    normalizeContent: normalizeContent, setContent: setContent, parseContentText: parseContentText,
+    loadContent: loadContent, saveContent: saveContent, clearContent: clearContent,
+    applyContentSettings: applyContentSettings,
+    defaults: defaults, normalize: normalize, load: load, save: save, clone: clone,
+    toTime: toTime, timeToMinutes: timeToMinutes, dateToStr: dateToStr, parseDate: parseDate,
+    dayKeyForDate: dayKeyForDate, activeDay: activeDay, daysUntil: daysUntil, phaseFor: phaseFor,
+    countdown: countdown, resolveTime: resolveTime, deroule: deroule, fillHeure: fillHeure,
+    essentialsDone: essentialsDone, rewardUnlocked: rewardUnlocked, toggleDayCheck: toggleDayCheck,
+    togglePrep: togglePrep, nextPrep: nextPrep, prepDoneToday: prepDoneToday,
+    amorceStatus: amorceStatus, startAmorce: startAmorce, amorceRemaining: amorceRemaining,
+    finishAmorce: finishAmorce, expireAmorces: expireAmorces, bumpCounter: bumpCounter, closeWeek: closeWeek,
+    toggleAnchor: toggleAnchor, setSetting: setSetting, selectDay: selectDay, LEVER_STEP: LEVER_STEP,
+    toggleRapport: function (state, id) { toggleIn(state.rapport, ids(RAPPORT), id); return state; },
+    toggleJob: function (state, id) { toggleIn(state.jobs, ids(JOBS), id); return state; },
+    interviewFor: interviewFor, interviewText: interviewText
+  };
+})();
+/*CORE-END*/
+</script>
+
+<script>
+/*VIEWS-START*/
+// Vues : fonctions pures (état → HTML), sans DOM, testables hors navigateur.
+// ctx = { today: Date, now: millisecondes, ui: { deroule: bool } }
+(function (Cap) {
+  'use strict';
+
+  var TAB_META = {
+    jour: { ico: '☀️', label: 'JOUR' },
+    rapport: { ico: '📄', label: 'RAPPORT' },
+    boulot: { ico: '🎯', label: 'BOULOT' },
+    cap: { ico: '🧭', label: 'CAP' }
+  };
+  var TICK = '<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function clock(sec) {
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function check(act, id, label, on) {
+    return '<button type="button" class="check' + (on ? ' on' : '') + '" role="checkbox" aria-checked="' + on +
+      '" data-act="' + act + '" data-id="' + esc(id) + '"><span class="box">' + TICK +
+      '</span><span class="lbl">' + esc(label) + '</span></button>';
+  }
+  function bar(done, total) {
+    var pct = total ? Math.round(done / total * 100) : 0;
+    return '<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done +
+      '"><i style="width:' + pct + '%"></i></div>';
+  }
+  function hero(emoji, lieu, amorce, slot) {
+    return '<section class="hero">' +
+      '<div class="hero-emoji" aria-hidden="true">' + esc(emoji) + '</div>' +
+      (lieu ? '<p class="hero-lieu">' + esc(lieu) + '</p>' : '') +
+      '<h1 class="hero-amorce">' + esc(amorce) + '</h1>' +
+      '<button type="button" class="go" data-act="amorce-start" data-slot="' + slot + '" aria-label="Lancer 5 minutes">5:00</button>' +
+      '<p class="hero-contract">Après, tu as le droit d’arrêter.</p>' +
+      '</section>';
+  }
+  function banner(state, slot, emoji, amorce, now) {
+    var status = Cap.amorceStatus(state, slot, now);
+    var sub = status === 'running'
+      ? '<span class="timer" data-timer="' + slot + '">' + clock(Cap.amorceRemaining(state, slot, now)) + '</span> · après, tu as le droit d’arrêter'
+      : 'Amorce faite ✓';
+    return '<section class="banner"><span class="banner-emoji" aria-hidden="true">' + esc(emoji) + '</span>' +
+      '<div><p class="banner-amorce">' + esc(amorce) + '</p><p class="banner-sub">' + sub + '</p></div></section>';
+  }
+
+  function header(state, ctx) {
+    var cd = Cap.countdown(state, ctx.today);
+    var j = cd.days > 0 ? 'J–' + cd.days : cd.days === 0 ? 'Jour J' : 'J+' + (-cd.days);
+    var k = Cap.activeDay(state, ctx.today);
+    return '<header class="top"><span class="pill">' + j + ' <small>' + esc(cd.label) + '</small></span>' +
+      '<span class="dayname">' + esc(Cap.DAYS[k].emoji) + ' ' + esc(Cap.DAYS[k].name) +
+      (state.selectedDay ? ' <small>(choisi)</small>' : '') + '</span></header>';
+  }
+
+  function tabbar(state) {
+    return '<div class="tabs-in">' + Cap.TABS.map(function (t) {
+      var on = state.tab === t;
+      return '<button type="button" class="tab' + (on ? ' on' : '') + '" data-act="tab" data-tab="' + t + '" aria-label="' + TAB_META[t].label + '"' +
+        (on ? ' aria-current="page"' : '') + '><span class="ico" aria-hidden="true">' + TAB_META[t].ico +
+        '</span><span>' + TAB_META[t].label + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  // ----- JOUR -----
+
+  function weekendView(state) {
+    var s = state.settings, it = Cap.DAYS.we.weekend;
+    return '<section class="hero light">' +
+      '<div class="hero-emoji" aria-hidden="true">' + esc(Cap.DAYS.we.emoji) + '</div>' +
+      '<h1 class="hero-amorce">On ne touche à rien.</h1>' +
+      '<p class="hero-text">Seule chose qui tient : le lever vers ' + esc(s.lever.replace(':', 'h')) + '.</p>' +
+      '<div style="width:100%;max-width:340px;margin-top:10px">' +
+      check('day-check', it.id, Cap.fillHeure(it.label, s), !!state.week.we.checks[it.id]) + '</div>' +
+      '</section>';
+  }
+
+  function prepView(state, ctx, k) {
+    var day = Cap.DAYS[k];
+    var doneTonight = Cap.prepDoneToday(state, ctx.today);
+    var next = Cap.nextPrep(state);
+    var total = Cap.PREP.length;
+    var done = Cap.PREP.filter(function (p) { return state.prep[p.id]; }).length;
+    var note = '<p class="note">' + esc(Cap.CONTENT.prepNote) + '</p>';
+
+    if (!next && !doneTonight) {
+      return '<section class="hero"><div class="hero-emoji" aria-hidden="true">✅</div>' +
+        '<h1 class="hero-amorce">Préparation terminée.</h1>' +
+        '<p class="hero-text">' + esc(Cap.CONTENT.prepDone) + '</p></section>' + note;
+    }
+    var status = Cap.amorceStatus(state, 'prep', ctx.now);
+    if (status === 'idle' && !doneTonight) return hero(day.emoji, 'Ce soir, une seule chose', next.label, 'prep');
+
+    var item = doneTonight || next;
+    return (status === 'idle' ? '' : banner(state, 'prep', day.emoji, item.label, ctx.now)) +
+      '<section class="block"><div class="block-head"><h2 class="block-title">Ce soir</h2>' +
+      '<span class="count">' + done + '/' + total + '</span></div>' + bar(done, total) +
+      check('prep-check', item.id, item.label, !!state.prep[item.id]) + '</section>' +
+      (doneTonight ? '<p class="note"><strong>Fait pour ce soir. On s’arrête là.</strong></p>' : '') + note;
+  }
+
+  function rewardCard(state, k) {
+    var r = Cap.DAYS[k].reward;
+    if (!r) return '';
+    var on = Cap.rewardUnlocked(state, k);
+    return '<section class="reward' + (on ? ' on' : '') + '">' +
+      '<div class="reward-emoji" aria-hidden="true">' + esc(r.emoji) + '</div>' +
+      '<div class="reward-body"><p class="reward-kicker">' + (on ? 'Ce soir, c’est débloqué' : 'Ce soir, quand les essentiels sont cochés') + '</p>' +
+      '<input class="reward-text" data-act="reward-text" data-day="' + k + '" maxlength="120" value="' + esc(state.rewards[k]) +
+      '" aria-label="Récompense du soir (modifiable)"></div></section>';
+  }
+
+  function dayView(state, ctx, k) {
+    var day = Cap.DAYS[k], d = state.week[k];
+    if (d.amorce === 'idle') return hero(day.emoji, day.lieu, day.amorce, k);
+
+    var ess = day.essentiels;
+    var nDone = ess.filter(function (it) { return d.checks[it.id]; }).length;
+    var html = banner(state, k, day.emoji, day.amorce, ctx.now);
+    html += '<section class="block"><div class="block-head"><h2 class="block-title">Essentiels</h2>' +
+      '<span class="count">' + nDone + '/' + ess.length + '</span></div>' + bar(nDone, ess.length) +
+      ess.map(function (it) { return check('day-check', it.id, it.label, !!d.checks[it.id]); }).join('') + '</section>';
+    html += rewardCard(state, k);
+    if (day.bonus.length) {
+      html += '<section class="block"><div class="block-head"><h2 class="block-title">Bonus</h2></div>' +
+        day.bonus.map(function (it) { return check('day-check', it.id, it.label, !!d.checks[it.id]); }).join('') + '</section>';
+    }
+    html += '<button type="button" class="link" data-act="toggle-deroule" aria-expanded="' + !!ctx.ui.deroule + '">' +
+      (ctx.ui.deroule ? '▾' : '▸') + ' Déroulé de la journée</button>';
+    if (ctx.ui.deroule) {
+      html += '<section class="block"><ol class="timeline">' + Cap.deroule(k, state.settings).map(function (r) {
+        return '<li><time>' + esc(r.time) + '</time><span>' + esc(r.label) + '</span></li>';
+      }).join('') + '</ol></section>';
+    }
+    return html;
+  }
+
+  function jour(state, ctx) {
+    var k = Cap.activeDay(state, ctx.today);
+    if (k === 'we') return weekendView(state);
+    if (Cap.phaseFor(state, ctx.today) === 'A') return prepView(state, ctx, k);
+    return dayView(state, ctx, k);
+  }
+
+  var JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  var MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  function longDate(str) {
+    var d = Cap.parseDate(str);
+    return d ? JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + MOIS[d.getMonth()] : str;
+  }
+
+  function checklist(title, act, list, map) {
+    var done = list.filter(function (it) { return map[it.id]; }).length;
+    var nextId = '';
+    for (var i = 0; i < list.length; i++) if (!map[list[i].id]) { nextId = list[i].id; break; }
+    return '<section class="block"><div class="block-head"><h2 class="block-title">' + esc(title) + '</h2>' +
+      '<span class="count">' + done + '/' + list.length + '</span></div>' + bar(done, list.length) +
+      list.map(function (it) {
+        var row = check(act, it.id, it.label, !!map[it.id]);
+        return it.id === nextId ? row.replace('class="check', 'class="check next') : row;
+      }).join('') + '</section>';
+  }
+
+  // ----- RAPPORT -----
+
+  function interview(state, ui) {
+    var iv = state.interview;
+    var html = '<section class="block" id="interview"><div class="block-head"><h2 class="block-title">🎙 L’interview</h2></div>';
+    if (!iv.title) {
+      return html + '<p class="hint">Écris le titre d’une section de ton plan. Tu reçois 7 questions. Tu réponds en vrac, au clavier ou avec le micro du clavier.</p>' +
+        '<form class="iv-form" data-act="interview-start">' +
+        '<input class="field" data-act="interview-draft" name="title" maxlength="200" placeholder="Ex. : Présentation de l’entreprise" value="' + esc(ui.draft || '') + '" aria-label="Titre de la section">' +
+        '<button type="submit" class="btn">Poser les 7 questions</button></form></section>';
+    }
+    var cat = Cap.interviewFor(iv.title);
+    var label = { '': 'Copier tout', busy: '…', ok: 'Copié ✓', fail: 'Copie impossible : sélectionne le texte ci-dessous' }[ui.copyState || ''];
+    html += '<p class="iv-title"><strong>' + esc(iv.title) + '</strong> <span class="tag">' + esc(cat.label) + '</span></p>' +
+      '<p class="hint">Style moche autorisé. Réponds en vrac, personne ne lira ça.</p><ol class="iv-list">';
+    cat.questions.forEach(function (q, i) {
+      html += '<li><div class="iv-q"><span>' + esc(q) + '</span>' +
+        '<button type="button" class="speak" data-act="speak" data-i="' + i + '" aria-label="Écouter la question"><span class="ico" aria-hidden="true">🔊</span></button></div>' +
+        '<textarea class="field" rows="3" data-act="interview-answer" data-i="' + i + '" aria-label="Réponse ' + (i + 1) + '">' +
+        esc(iv.answers[i]) + '</textarea></li>';
+    });
+    html += '</ol><div class="row">' +
+      '<button type="button" class="btn" data-act="interview-copy"' + (ui.copyState === 'busy' ? ' disabled' : '') + '>' + esc(label) + '</button>' +
+      '<button type="button" class="btn ghost" data-act="interview-reset">Nouvelle section</button></div>';
+    if (ui.copyState === 'fail') {
+      html += '<textarea class="field" rows="8" readonly data-act="copy-fallback" aria-label="Texte à copier">' +
+        esc(Cap.interviewText(iv.title, iv.answers)) + '</textarea>';
+    }
+    return html + '</section>';
+  }
+
+  function rapport(state, ctx) {
+    var s = state.settings;
+    var n = Cap.daysUntil(s.rendu, ctx.today);
+    return '<h1 class="page-title">📄 Rapport</h1>' +
+      '<p class="page-sub">Rendu ' + esc(longDate(s.rendu)) + (n >= 0 ? ' · J–' + n : '') + '. Tu ne rédiges pas, tu réponds à des questions.</p>' +
+      checklist('La méthode', 'rapport-check', Cap.RAPPORT, state.rapport) +
+      interview(state, ctx.ui || {});
+  }
+
+  // ----- BOULOT -----
+
+  function boulot(state) {
+    var counters = '<div class="counters">' + Cap.COUNTERS.map(function (c) {
+      return '<section class="counter" style="--c1:' + c.c1 + ';--c2:' + c.c2 + '">' +
+        '<span class="counter-n">' + state.counters[c.id] + '</span>' +
+        '<span class="counter-l">' + esc(c.label) + '</span>' +
+        '<div class="counter-btns">' +
+        '<button type="button" class="minus" data-act="counter" data-id="' + c.id + '" data-delta="-1" aria-label="Retirer 1 : ' + esc(c.label) + '">−1</button>' +
+        '<button type="button" class="plus" data-act="counter" data-id="' + c.id + '" data-delta="1" aria-label="Ajouter 1 : ' + esc(c.label) + '">+1</button>' +
+        '</div></section>';
+    }).join('') + '</div>';
+    return '<h1 class="page-title">🎯 Boulot</h1>' +
+      '<p class="page-sub">' + esc(Cap.CONTENT.jobsIntro) + '</p>' +
+      counters + checklist('Les outils à préparer', 'job-check', Cap.JOBS, state.jobs);
+  }
+
+  // ----- CAP -----
+
+  function capView(state, ctx) {
+    var s = state.settings;
+    var k = Cap.activeDay(state, ctx.today);
+    var todayKey = Cap.dayKeyForDate(ctx.today);
+    var phase = Cap.phaseFor(state, ctx.today);
+    var heure = function (t) { return t.replace(':', 'h'); };
+
+    var chips = '<div class="chips" role="radiogroup" aria-label="Jour affiché">' +
+      '<button type="button" class="chip' + (!state.selectedDay ? ' on' : '') + '" role="radio" aria-checked="' + !state.selectedDay +
+      '" data-act="select-day" data-day="" style="--c1:' + Cap.DAYS[todayKey].c1 + ';--c2:' + Cap.DAYS[todayKey].c2 + '">Aujourd’hui</button>' +
+      Cap.DAY_KEYS.map(function (d) {
+        var on = state.selectedDay === d;
+        return '<button type="button" class="chip' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on +
+          '" data-act="select-day" data-day="' + d + '" style="--c1:' + Cap.DAYS[d].c1 + ';--c2:' + Cap.DAYS[d].c2 + '">' +
+          esc(Cap.DAYS[d].emoji) + ' ' + esc(Cap.DAYS[d].name.slice(0, 3)) + (d === 'we' ? '' : '.') + '</button>';
+      }).join('') + '</div>';
+
+    var a = state.week[k].anchors;
+    var anchors = '<section class="block"><div class="block-head"><h2 class="block-title">Les ancres · ' + esc(Cap.DAYS[k].name) + '</h2></div>' +
+      '<p class="hint">Visibles, jamais bloquantes.</p>' +
+      check('anchor', 'lever', 'Lever vers ' + heure(s.lever), a.lever) +
+      (k === 'we' ? '' : check('anchor', 'fermeture', 'Écrans de travail éteints à ' + heure(s.fermeture), a.fermeture)) +
+      '</section>';
+
+    function field(key, type, label, value) {
+      return '<label class="set"><span>' + label + '</span><input class="field" type="' + type + '" data-act="setting" data-key="' + key +
+        '" value="' + esc(value) + '"></label>';
+    }
+    var settings = '<section class="block"><div class="block-head"><h2 class="block-title">Réglages</h2></div>' +
+      '<div class="sets">' +
+      field('lever', 'time', 'Lever', s.lever) +
+      field('fermeture', 'time', 'Fermeture', s.fermeture) +
+      field('finStage', 'date', 'Fin de la phase A', s.finStage) +
+      field('rendu', 'date', 'Échéance', s.rendu) +
+      '<label class="set"><span>Phase</span><select class="field" data-act="setting" data-key="phase">' +
+      [['auto', 'Automatique (' + phase + ')'], ['A', 'A : avant la bascule'], ['B', 'B : semaine type']].map(function (o) {
+        return '<option value="' + o[0] + '"' + (s.phase === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+      }).join('') + '</select></label></div>' +
+      '<p class="hint">Le lever recule de ' + Cap.LEVER_STEP + ' min à chaque semaine close, jamais après ' + heure(s.leverMax) + '.</p>' +
+      '</section>';
+
+    var nextLever = Cap.timeToMinutes(s.lever) + Cap.LEVER_STEP <= Cap.timeToMinutes(s.leverMax);
+    var close = '<section class="block"><div class="block-head"><h2 class="block-title">Fin de semaine</h2></div>' +
+      '<p class="hint">Décoche la semaine' + (nextLever ? ', le lever recule de 30 min' : '') +
+      '. Le rapport, les outils et les compteurs restent.' +
+      (state.weeksClosed ? ' Semaines closes : ' + state.weeksClosed + '.' : '') + '</p>' +
+      '<button type="button" class="btn" data-act="close-week">Clore la semaine</button></section>';
+
+    var rules = '<section class="block"><div class="block-head"><h2 class="block-title">Les règles</h2></div>' +
+      Cap.RULES.map(function (r) {
+        var open = state.openRule === r.id;
+        return '<div class="rule"><button type="button" class="rule-head" data-act="rule" data-id="' + r.id + '" aria-expanded="' + open + '">' +
+          '<span>' + esc(r.title) + '</span><span class="chev" aria-hidden="true">' + (open ? '−' : '+') + '</span></button>' +
+          (open ? '<ul class="rule-body">' + r.text.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '') +
+          '</div>';
+      }).join('') + '</section>';
+
+    var info = ctx.contentInfo || { source: 'exemple', importedAt: '' };
+    var ui = ctx.ui || {};
+    var content = '<section class="block"><div class="block-head"><h2 class="block-title">Mon contenu</h2></div>' +
+      '<p class="hint">' + (info.source === 'perso'
+        ? 'Ton contenu' + (info.importedAt ? ', importé le ' + esc(longDate(info.importedAt)) : '') + '. Il reste dans ce navigateur.'
+        : 'Contenu d’exemple. Importe ton fichier <strong>perso.json</strong> pour retrouver tes jours. Il restera dans ce navigateur, nulle part ailleurs.') +
+      '</p>' + (ui.importMsg ? '<p class="msg" role="status">' + esc(ui.importMsg) + '</p>' : '') +
+      '<div class="row"><label class="btn">Importer perso.json' +
+      '<input type="file" class="file" accept=".json,application/json" data-act="import-file"></label>' +
+      (info.source === 'perso' ? '<button type="button" class="btn ghost" data-act="content-reset">Revenir à l’exemple</button>' : '') +
+      '</div></section>';
+
+    return '<h1 class="page-title">🧭 Cap</h1>' +
+      '<p class="page-sub">Le jour affiché change les couleurs et l’écran JOUR.</p>' +
+      chips + anchors + settings + close + content + rules;
+  }
+
+  Cap.views = {
+    esc: esc, clock: clock, header: header, tabbar: tabbar, jour: jour,
+    rapport: rapport,
+    boulot: boulot,
+    cap: capView
+  };
+})(Cap);
+/*VIEWS-END*/
+</script>
+
+<script>
+// Interface : un seul gestionnaire délégué sur document, jamais réattaché.
+(function () {
+  'use strict';
+  if (typeof document === 'undefined') return;
+
+  var root = document.getElementById('app');
+  var nav = document.getElementById('tabs');
+  var themeMeta = document.querySelector('meta[name="theme-color"]');
+  // Le contenu d'abord : l'état en dépend (identifiants des cases, réglages par défaut).
+  var loaded = Cap.loadContent();
+  Cap.setContent(loaded.content);
+  var contentInfo = { source: loaded.source, importedAt: loaded.importedAt };
+  var state = Cap.load();
+  var ui = { deroule: false, draft: '', copyState: '', importMsg: '' };
+  var copyToken = 0, importToken = 0;
+  var CONFETTI_COLORS = Cap.DAY_KEYS.reduce(function (a, k) { return a.concat([Cap.DAYS[k].c1, Cap.DAYS[k].c2]); }, []);
+
+  if (Cap.expireAmorces(state, Date.now())) Cap.save(state);
+
+  function ctx() { var now = Date.now(); return { today: new Date(now), now: now, ui: ui, contentInfo: contentInfo }; }
+
+  // Lecture d'un fichier avec délai maximum : le message « Lecture… » ne reste jamais affiché.
+  function readFile(file, done) {
+    var finished = false;
+    function finish(err, text) { if (!finished) { finished = true; clearTimeout(timer); done(err, text); } }
+    var timer = setTimeout(function () { finish('La lecture du fichier a pris trop de temps. Réessaie.'); }, 5000);
+    if (!file) { finish('Aucun fichier choisi.'); return; }
+    if (file.size > 500000) { finish('Ce fichier est trop gros pour être un contenu Cap.'); return; }
+    try {
+      var reader = new FileReader();
+      reader.onload = function () { finish(null, String(reader.result)); };
+      reader.onerror = function () { finish('Le fichier n’a pas pu être lu.'); };
+      reader.readAsText(file);
+    } catch (err) { finish('Le fichier n’a pas pu être lu.'); }
+  }
+
+  function importFile(file) {
+    var token = ++importToken;
+    ui.importMsg = 'Lecture…';
+    render();
+    readFile(file, function (err, text) {
+      if (token !== importToken) return;     // un autre import ou une remise à zéro est passé entre-temps
+      if (err) { ui.importMsg = err; render(); return; }
+      var r = Cap.parseContentText(text);
+      if (!r.ok) { ui.importMsg = r.error; render(); return; }
+      var stored = Cap.saveContent(r.content, new Date());
+      Cap.setContent(r.content);
+      contentInfo = { source: 'perso', importedAt: Cap.dateToStr(new Date()) };
+      // On garde l'état courant (actions faites pendant la lecture comprises) et on le remet en forme.
+      Cap.applyContentSettings(state);
+      state = Cap.normalize(state);
+      Cap.save(state);
+      ui.importMsg = 'Contenu importé ✓' +
+        (stored ? '' : '\nCe navigateur refuse l’enregistrement : il faudra réimporter à la prochaine ouverture.') +
+        (r.warnings.length ? '\n' + r.warnings.length + ' point(s) corrigé(s) : ' + r.warnings.slice(0, 3).join(' ') : '');
+      render();
+      confetti();
+    });
+  }
+
+  function safe(fn, label) {
+    try { return fn(); } catch (e) {
+      return '<div class="oops"><strong>' + label + ' n’a pas pu s’afficher.</strong><br>' +
+        'Les autres onglets fonctionnent toujours. Détail : ' + Cap.views.esc(e && e.message) + '</div>';
+    }
+  }
+
+  var renderedDay = '';
+
+  function render() {
+    var y = window.scrollY;
+    var c = ctx();
+    renderedDay = Cap.dateToStr(c.today);
+    var day = Cap.DAYS[Cap.activeDay(state, c.today)];
+    var rs = document.documentElement.style;
+    rs.setProperty('--day', day.c1);
+    rs.setProperty('--day2', day.c2);
+    if (themeMeta) themeMeta.setAttribute('content', day.c1);
+    root.innerHTML = safe(function () { return Cap.views.header(state, c); }, 'L’en-tête') +
+      safe(function () { return Cap.views[state.tab](state, c); }, 'Cet onglet');
+    nav.innerHTML = safe(function () { return Cap.views.tabbar(state); }, 'La barre d’onglets');
+    window.scrollTo(0, y);
+  }
+
+  function commit() { Cap.save(state); render(); }
+
+  function confetti() {
+    var layer = document.createElement('div');
+    layer.className = 'confetti';
+    layer.setAttribute('aria-hidden', 'true');
+    for (var i = 0; i < 40; i++) {
+      var p = document.createElement('i');
+      p.style.left = (Math.random() * 100) + '%';
+      p.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      p.style.animationDelay = (Math.random() * 0.25) + 's';
+      p.style.setProperty('--dx', (Math.random() * 120 - 60) + 'px');
+      p.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg');
+      layer.appendChild(p);
+    }
+    document.body.appendChild(layer);
+    setTimeout(function () { if (layer.parentNode) layer.parentNode.removeChild(layer); }, 2400);
+  }
+
+  // Copie avec délai maximum et repli : le bouton ne reste jamais bloqué sur « … ».
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  function copyText(text, done) {
+    var finished = false;
+    function finish(ok) { if (!finished) { finished = true; done(ok); } }
+    var timer = setTimeout(function () { finish(fallbackCopy(text)); }, 1500);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(
+          function () { clearTimeout(timer); finish(true); },
+          function () { clearTimeout(timer); finish(fallbackCopy(text)); });
+      } else { clearTimeout(timer); finish(fallbackCopy(text)); }
+    } catch (err) { clearTimeout(timer); finish(fallbackCopy(text)); }
+  }
+
+  function speak(text) {
+    try {
+      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'fr-FR';
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    } catch (err) { /* lecture vocale indisponible : rien à faire */ }
+  }
+
+  function handle(e) {
+    // Retour sur l'appli : on ne redessine que si la date a changé (le chrono se met à jour seul).
+    if (e.type === 'visibilitychange') {
+      if (!document.hidden && Cap.dateToStr(new Date()) !== renderedDay) render();
+      return;
+    }
+    var el = e.target && e.target.closest ? e.target.closest('[data-act]') : null;
+    if (!el) return;
+    var act = el.getAttribute('data-act');
+    var c = ctx();
+    var k = Cap.activeDay(state, c.today);
+
+    if (e.type === 'input') {
+      // Saisie : on enregistre sans re-rendre, pour ne pas perdre le curseur.
+      if (act === 'reward-text') {
+        var d = el.getAttribute('data-day');
+        if (state.rewards.hasOwnProperty(d)) { state.rewards[d] = el.value.slice(0, 120); Cap.save(state); }
+      } else if (act === 'interview-draft') {
+        ui.draft = el.value;
+      } else if (act === 'interview-answer') {
+        var i = Number(el.getAttribute('data-i'));
+        if (i >= 0 && i < 7) { state.interview.answers[i] = el.value.slice(0, 5000); Cap.save(state); }
+      }
+      return;
+    }
+
+    if (e.type === 'change') {
+      if (act === 'import-file') { importFile(el.files && el.files[0]); return; }
+      if (act === 'setting') {
+        // Valeur refusée : on redessine quand même pour remettre l'ancienne valeur affichée.
+        Cap.setSetting(state, el.getAttribute('data-key'), el.value);
+        commit();
+      }
+      return;
+    }
+
+    if (e.type === 'submit') {
+      e.preventDefault();
+      if (act === 'interview-start') {
+        var title = (ui.draft || '').trim();
+        if (!title) { var f = el.querySelector('input'); if (f) f.focus(); return; }
+        state.interview = { title: title.slice(0, 200), answers: ['', '', '', '', '', '', ''] };
+        ui.draft = ''; ui.copyState = '';
+        commit();
+      }
+      return;
+    }
+    if (e.type !== 'click' || /^(INPUT|TEXTAREA|SELECT|FORM)$/.test(el.tagName)) return;
+
+    switch (act) {
+      case 'tab':
+        var t = el.getAttribute('data-tab');
+        if (Cap.TABS.indexOf(t) >= 0 && t !== state.tab) { state.tab = t; Cap.save(state); render(); window.scrollTo(0, 0); }
+        return;
+      case 'amorce-start':
+        Cap.startAmorce(state, el.getAttribute('data-slot') === 'prep' ? 'prep' : k, c.now);
+        commit(); window.scrollTo(0, 0);
+        return;
+      case 'day-check':
+        var before = k === 'we' ? !!state.week.we.checks['we-lever'] : Cap.essentialsDone(state, k);
+        Cap.toggleDayCheck(state, k, el.getAttribute('data-id'));
+        var after = k === 'we' ? !!state.week.we.checks['we-lever'] : Cap.essentialsDone(state, k);
+        commit();
+        if (!before && after) confetti();
+        return;
+      case 'prep-check':
+        var id = el.getAttribute('data-id');
+        var wasOn = !!state.prep[id];
+        Cap.togglePrep(state, id, c.today);
+        commit();
+        if (!wasOn) confetti();
+        return;
+      case 'toggle-deroule':
+        ui.deroule = !ui.deroule; render();
+        return;
+      case 'rapport-check':
+        var rWas = Cap.RAPPORT.every(function (r) { return state.rapport[r.id]; });
+        Cap.toggleRapport(state, el.getAttribute('data-id'));
+        commit();
+        if (!rWas && Cap.RAPPORT.every(function (r) { return state.rapport[r.id]; })) confetti();
+        return;
+      case 'job-check':
+        Cap.toggleJob(state, el.getAttribute('data-id'));
+        commit();
+        return;
+      case 'counter':
+        Cap.bumpCounter(state, el.getAttribute('data-id'), Number(el.getAttribute('data-delta')) > 0 ? 1 : -1);
+        commit();
+        return;
+      case 'speak':
+        var q = Cap.interviewFor(state.interview.title).questions[Number(el.getAttribute('data-i'))];
+        if (q) speak(q);
+        return;
+      case 'interview-copy':
+        var token = ++copyToken;
+        var title0 = state.interview.title;
+        ui.copyState = 'busy'; render();
+        copyText(Cap.interviewText(state.interview.title, state.interview.answers), function (ok) {
+          // Réponse arrivée trop tard (autre copie, ou autre section) : on l'ignore.
+          if (token !== copyToken || state.interview.title !== title0) return;
+          ui.copyState = ok ? 'ok' : 'fail';
+          render();
+          if (ok) setTimeout(function () { if (token === copyToken && ui.copyState === 'ok') { ui.copyState = ''; render(); } }, 2500);
+        });
+        return;
+      case 'select-day':
+        Cap.selectDay(state, el.getAttribute('data-day'));
+        commit();
+        return;
+      case 'anchor':
+        Cap.toggleAnchor(state, k, el.getAttribute('data-id'));
+        commit();
+        return;
+      case 'rule':
+        var rid = el.getAttribute('data-id');
+        state.openRule = state.openRule === rid ? '' : rid;
+        commit();
+        return;
+      case 'close-week':
+        var s0 = state.settings;
+        var leverAfter = Math.min(Cap.timeToMinutes(s0.lever) + Cap.LEVER_STEP, Cap.timeToMinutes(s0.leverMax));
+        var newLever = Cap.toTime(leverAfter, s0.lever).replace(':', 'h');
+        if (!window.confirm('Clore la semaine ?\n\nToutes les cases de la semaine se décochent. Lever : ' + newLever +
+          '.\nLe rapport, les outils et les compteurs restent.')) return;
+        Cap.closeWeek(state);
+        commit();
+        window.scrollTo(0, 0);
+        return;
+      case 'content-reset':
+        if (!window.confirm('Revenir au contenu d’exemple ?\n\nTon contenu importé est retiré de ce navigateur. Ton fichier perso.json n’est pas touché.')) return;
+        importToken++;
+        Cap.clearContent();
+        Cap.setContent(Cap.normalizeContent(Cap.SAMPLE).content);
+        contentInfo = { source: 'exemple', importedAt: '' };
+        Cap.applyContentSettings(state);
+        state = Cap.normalize(state);
+        ui.importMsg = 'Contenu d’exemple rétabli.';
+        commit();
+        return;
+      case 'interview-reset':
+        var hasText = state.interview.answers.some(function (a) { return a.trim(); });
+        if (hasText && !window.confirm('Effacer les réponses de cette section ? Pense à les copier avant.')) return;
+        copyToken++;
+        state.interview = { title: '', answers: ['', '', '', '', '', '', ''] };
+        ui.copyState = '';
+        commit();
+        return;
+    }
+  }
+
+  ['click', 'input', 'change', 'submit', 'visibilitychange'].forEach(function (type) { document.addEventListener(type, handle); });
+
+  // Chrono : met à jour le texte seulement ; re-rend une fois à la fin.
+  setInterval(function () {
+    var timers = document.querySelectorAll('[data-timer]');
+    if (!timers.length) return;
+    var now = Date.now();
+    for (var i = 0; i < timers.length; i++) {
+      var slot = timers[i].getAttribute('data-timer');
+      var left = Cap.amorceRemaining(state, slot, now);
+      timers[i].textContent = Cap.views.clock(left);
+      if (left === 0 && Cap.amorceStatus(state, slot, now) === 'running') {
+        Cap.finishAmorce(state, slot, now);
+        commit();
+        confetti();
+        return;
+      }
+    }
+  }, 1000);
+
+  try { render(); } catch (e) {
+    root.textContent = 'Cap n’a pas pu démarrer : ' + (e && e.message);
+  }
+})();
+</script>
+</body>
+</html>

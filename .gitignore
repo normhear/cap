@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.log
+.claude/
+# Contenu personnel : reste sur cette machine, ne va jamais sur GitHub.
+perso.json
