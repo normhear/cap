@@ -301,41 +301,45 @@ var Cap = (function () {
         name: 'Mardi', emoji: '📘', c1: '#7c3aed', c2: '#c084fc',
         lieu: 'Au bureau',
         amorce: 'Ouvre le document à une section vide. Dicte 5 minutes.',
-        essentiels: [{ id: 'mar-session', label: 'Une session de 45 min' }],
+        amorceApres: 'Ouvre ta to-do. Lis la première tâche à voix haute.',
+        essentiels: [{ id: 'mar-session', label: 'Une session de 45 min', rapport: true }],
         bonus: [{ id: 'mar-poste', label: 'Ranger le poste de travail' }],
         reward: { emoji: '🎧', text: 'Un épisode de ta série' },
-        deroule: [['=w', 'Réveil'], ['+120', 'Session'], ['+300', 'Déjeuner'], ['=c', 'Fermeture']]
+        deroule: [['=w', 'Réveil'], ['+120', 'Session', 'rapport'], ['+300', 'Déjeuner'], ['=c', 'Fermeture']]
       },
       mer: {
         name: 'Mercredi', emoji: '🖥', c1: '#ea580c', c2: '#fbbf24',
         lieu: 'Au bureau',
         amorce: 'Relis à voix haute les 3 dernières lignes d’hier.',
+        amorceApres: 'Lis à voix haute les deux premières tâches de ta to-do.',
         essentiels: [
-          { id: 'mer-a', label: 'Session A' },
-          { id: 'mer-b', label: 'Session B' }
+          { id: 'mer-a', label: 'Session A', rapport: true },
+          { id: 'mer-b', label: 'Session B', rapport: true }
         ],
         bonus: [{ id: 'mer-projet', label: 'Une étape d’un projet perso' }],
         reward: { emoji: '🎨', text: 'Ton activité créative préférée' },
-        deroule: [['=w', 'Réveil'], ['+90', 'Session A'], ['13:00', 'Déjeuner'], ['15:00', 'Session B'], ['=c', 'Fermeture']]
+        deroule: [['=w', 'Réveil'], ['+90', 'Session A', 'rapport'], ['13:00', 'Déjeuner'], ['15:00', 'Session B', 'rapport'], ['=c', 'Fermeture']]
       },
       jeu: {
         name: 'Jeudi', emoji: '🌿', c1: '#15803d', c2: '#4ade80',
         lieu: 'Au bureau, puis retour',
         amorce: 'Une session avant de partir. 45 minutes.',
+        amorceApres: 'Une tâche de ta to-do avant de partir.',
         essentiels: [
-          { id: 'jeu-session', label: 'Une session' },
+          { id: 'jeu-session', label: 'Une session', rapport: true },
           { id: 'jeu-etapes', label: 'Noter les 3 prochaines étapes' }
         ],
         bonus: [],
         reward: { emoji: '🎮', text: 'Jeu vidéo — rien d’exigeant' },
-        deroule: [['=w', 'Réveil'], ['+90', 'Session'], ['13:00', 'Déjeuner'], ['17:00', 'Chez toi. Rien de prévu.']]
+        deroule: [['=w', 'Réveil'], ['+90', 'Session', 'rapport'], ['13:00', 'Déjeuner'], ['17:00', 'Chez toi. Rien de prévu.']]
       },
       ven: {
         name: 'Vendredi', emoji: '🎈', c1: '#be185d', c2: '#fb7185',
         lieu: 'Café',
         amorce: 'Lis à voix haute ce que tu as écrit cette semaine.',
+        amorceApres: 'Lis à voix haute ce que tu as coché cette semaine.',
         essentiels: [
-          { id: 'ven-relecture', label: 'Relecture à voix haute' },
+          { id: 'ven-relecture', label: 'Relecture à voix haute', rapport: true },
           { id: 'ven-cand', label: 'Une candidature' }
         ],
         bonus: [
@@ -343,7 +347,7 @@ var Cap = (function () {
           { id: 'ven-bilan', label: 'Bilan 3 lignes' }
         ],
         reward: { emoji: '🍿', text: 'Ciné ou sortie' },
-        deroule: [['=w', 'Réveil'], ['+90', 'Café : relecture'], ['14:00', 'Candidatures'], ['=c', 'Fermeture']]
+        deroule: [['=w', 'Réveil'], ['+90', 'Café : relecture', 'rapport'], ['14:00', 'Candidatures'], ['=c', 'Fermeture']]
       },
       we: {
         name: 'Week-end', emoji: '🌤', c1: '#ca8a04', c2: '#fde047',
@@ -543,7 +547,7 @@ var Cap = (function () {
   function ids(list) { return list.map(function (it) { return it.id; }); }
 
   function emptyDay() {
-    return { amorce: 'idle', startedAt: 0, checks: {}, anchors: { lever: false, fermeture: false } };
+    return { amorce: 'idle', startedAt: 0, checks: {}, anchors: { lever: false, fermeture: false }, todoPicks: [] };
   }
 
   function defaults() {
@@ -609,6 +613,11 @@ var Cap = (function () {
     if (!isObj(v)) return out;
     normAmorce(v, out);
     out.checks = checkMap(v.checks, dayItemIds(k));
+    if (Array.isArray(v.todoPicks)) {
+      out.todoPicks = v.todoPicks.filter(function (id, i, a) {
+        return typeof id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(id) && a.indexOf(id) === i;
+      }).slice(0, 2);
+    }
     if (isObj(v.anchors)) {
       out.anchors.lever = toBool(v.anchors.lever);
       out.anchors.fermeture = toBool(v.anchors.fermeture);
@@ -757,7 +766,9 @@ var Cap = (function () {
         }
         if (seen[it.id]) { w.push(where + ' : identifiant en double « ' + it.id + ' » ignoré.'); return; }
         seen[it.id] = true;
-        out.push({ id: it.id, label: it.label.slice(0, 200) });
+        var item = { id: it.id, label: it.label.slice(0, 200) };
+        if (it.rapport === true) item.rapport = true;   // masqué une fois le rapport rendu
+        out.push(item);
       });
       if (max && out.length > max) { w.push(where + ' : ' + max + ' au maximum, le reste est ignoré.'); out = out.slice(0, max); }
       return out;
@@ -770,7 +781,7 @@ var Cap = (function () {
           (r[0].indexOf(':') < 0 || toTime(r[0], '') === r[0]) && typeof r[1] === 'string';
         if (!ok) w.push(where + ' : une ligne mal formée est ignorée.');
         return ok;
-      }).map(function (r) { return [r[0], r[1].slice(0, 120)]; });
+      }).map(function (r) { return r[2] === 'rapport' ? [r[0], r[1].slice(0, 120), 'rapport'] : [r[0], r[1].slice(0, 120)]; });
     }
 
     var s = isObj(src.settings) ? src.settings : {};
@@ -794,6 +805,7 @@ var Cap = (function () {
         c1: color(d.c1, base.c1), c2: color(d.c2, base.c2),
         lieu: k === 'we' ? '' : str(d.lieu, base.lieu, 80),
         amorce: k === 'we' ? '' : str(d.amorce, base.amorce, 160),
+        amorceApres: k === 'we' ? '' : str(d.amorceApres, base.amorceApres || '', 160),   // amorce une fois le rapport rendu
         essentiels: k === 'we' ? [] : items(d.essentiels, base.essentiels, 2, name + ', essentiels'),
         bonus: k === 'we' ? [] : items(d.bonus, base.bonus, 6, name + ', bonus'),
         reward: null,
@@ -920,8 +932,8 @@ var Cap = (function () {
     if (/^\+\d+$/.test(t)) return minutesToTime(timeToMinutes(settings.lever) + Number(t.slice(1)));
     return t;
   }
-  function deroule(k, settings) {
-    return DAYS[k].deroule.map(function (row) {
+  function deroule(k, settings, rendu) {
+    return DAYS[k].deroule.filter(function (row) { return !(rendu && row[2] === 'rapport'); }).map(function (row) {
       return { time: resolveTime(row[0], settings), label: row[1] };
     });
   }
@@ -929,13 +941,68 @@ var Cap = (function () {
     return text.replace(/\[heure\]/g, settings.lever.replace(':', 'h'));
   }
 
+  // ---------- Après le rendu du rapport ----------
+  // Les tâches marquées « rapport » disparaissent ; chaque essentiel retiré libère une place,
+  // remplie par les premières tâches de la to-do (deux essentiels au plus, comme toujours).
+
+  function isRendu(state) { return !!state.rapportRendu; }
+  function keepItem(state) { return function (it) { return !(isRendu(state) && it.rapport); }; }
+  function todoSlots(state, k) {
+    if (!isRendu(state)) return 0;
+    var ess = DAYS[k].essentiels;
+    var kept = ess.filter(keepItem(state)).length;
+    return Math.max(0, Math.min(ess.length - kept, 2 - kept));
+  }
+  // Les tâches retenues pour la journée : celles déjà retenues (même faites, pour que la journée
+  // puisse se valider), puis les premières à faire. Ne modifie pas l'état.
+  function computePicks(state, k) {
+    var slots = todoSlots(state, k);
+    var exists = function (id) { return state.todos.some(function (t) { return t.id === id; }); };
+    var picks = state.week[k].todoPicks.filter(exists).slice(0, slots);
+    state.todos.forEach(function (t) {
+      if (picks.length < slots && !t.done && picks.indexOf(t.id) < 0) picks.push(t.id);
+    });
+    return picks;
+  }
+  // Enregistre les tâches retenues. Renvoie true si elles ont changé.
+  function syncTodoPicks(state, k) {
+    if (k === 'we') return false;
+    var picks = computePicks(state, k);
+    var changed = JSON.stringify(picks) !== JSON.stringify(state.week[k].todoPicks);
+    state.week[k].todoPicks = picks;
+    return changed;
+  }
+  // Essentiels affichés : [{ id, label, todo, done }].
+  function dayEssentials(state, k) {
+    var c = state.week[k].checks;
+    var list = DAYS[k].essentiels.filter(keepItem(state)).map(function (it) {
+      return { id: it.id, label: it.label, todo: false, done: c[it.id] === true };
+    });
+    computePicks(state, k).forEach(function (id) {
+      var t = state.todos.filter(function (x) { return x.id === id; })[0];
+      if (t) list.push({ id: t.id, label: t.text, todo: true, done: t.done });
+    });
+    return list;
+  }
+  function dayBonus(state, k) { return DAYS[k].bonus.filter(keepItem(state)); }
+  function dayAmorce(state, k) {
+    var d = DAYS[k];
+    return isRendu(state) && d.amorceApres ? d.amorceApres : d.amorce;
+  }
+  // L'onglet Rapport disparaît une fois le rapport rendu.
+  function visibleTabs(state) {
+    return TABS.filter(function (t) { return !(t === 'rapport' && isRendu(state)); });
+  }
+  function currentTab(state) {
+    return visibleTabs(state).indexOf(state.tab) >= 0 ? state.tab : 'jour';
+  }
+
   // ---------- Actions ----------
 
   function essentialsDone(state, k) {
-    var ess = DAYS[k].essentiels;
+    var ess = dayEssentials(state, k);
     if (!ess.length) return false;
-    var c = state.week[k].checks;
-    return ess.every(function (it) { return c[it.id] === true; });
+    return ess.every(function (it) { return it.done; });
   }
   function rewardUnlocked(state, k) {
     return !!DAYS[k].reward && essentialsDone(state, k);
@@ -1152,6 +1219,8 @@ var Cap = (function () {
     TODO_MAX: TODO_MAX, addTodo: addTodo, toggleTodo: toggleTodo, removeTodo: removeTodo,
     restoreTodo: restoreTodo, sortedTodos: sortedTodos,
     setRapportRendu: setRapportRendu, unsetRapportRendu: unsetRapportRendu,
+    isRendu: isRendu, todoSlots: todoSlots, syncTodoPicks: syncTodoPicks, dayEssentials: dayEssentials,
+    dayBonus: dayBonus, dayAmorce: dayAmorce, visibleTabs: visibleTabs, currentTab: currentTab,
     toggleRapport: function (state, id) { toggleIn(state.rapport, ids(RAPPORT), id); return state; },
     toggleJob: function (state, id) { toggleIn(state.jobs, ids(JOBS), id); return state; },
     interviewFor: interviewFor, interviewText: interviewText
@@ -1217,14 +1286,17 @@ var Cap = (function () {
     var cd = Cap.countdown(state, ctx.today);
     var j = cd.days > 0 ? 'J–' + cd.days : cd.days === 0 ? 'Jour J' : 'J+' + (-cd.days);
     var k = Cap.activeDay(state, ctx.today);
-    return '<header class="top"><span class="pill">' + j + ' <small>' + esc(cd.label) + '</small></span>' +
+    var pill = Cap.isRendu(state) && Cap.phaseFor(state, ctx.today) === 'B'
+      ? '📨 <small>rapport rendu</small>' : j + ' <small>' + esc(cd.label) + '</small>';
+    return '<header class="top"><span class="pill">' + pill + '</span>' +
       '<span class="dayname">' + esc(Cap.DAYS[k].emoji) + ' ' + esc(Cap.DAYS[k].name) +
       (state.selectedDay ? ' <small>(choisi)</small>' : '') + '</span></header>';
   }
 
   function tabbar(state) {
-    return '<div class="tabs-in">' + Cap.TABS.map(function (t) {
-      var on = state.tab === t;
+    var cur = Cap.currentTab(state);
+    return '<div class="tabs-in">' + Cap.visibleTabs(state).map(function (t) {
+      var on = cur === t;
       return '<button type="button" class="tab' + (on ? ' on' : '') + '" data-act="tab" data-tab="' + t + '" aria-label="' + TAB_META[t].label + '"' +
         (on ? ' aria-current="page"' : '') + '><span class="ico" aria-hidden="true">' + TAB_META[t].ico +
         '</span><span>' + TAB_META[t].label + '</span></button>';
@@ -1281,23 +1353,29 @@ var Cap = (function () {
 
   function dayView(state, ctx, k) {
     var day = Cap.DAYS[k], d = state.week[k];
-    if (d.amorce === 'idle') return hero(day.emoji, day.lieu, day.amorce, k);
+    var amorce = Cap.dayAmorce(state, k);
+    if (d.amorce === 'idle') return hero(day.emoji, day.lieu, amorce, k);
 
-    var ess = day.essentiels;
-    var nDone = ess.filter(function (it) { return d.checks[it.id]; }).length;
-    var html = banner(state, k, day.emoji, day.amorce, ctx.now);
+    var ess = Cap.dayEssentials(state, k);
+    var bonus = Cap.dayBonus(state, k);
+    var nDone = ess.filter(function (it) { return it.done; }).length;
+    var missing = Cap.todoSlots(state, k) - ess.filter(function (it) { return it.todo; }).length;
+    var html = banner(state, k, day.emoji, amorce, ctx.now);
     html += '<section class="block"><div class="block-head"><h2 class="block-title">Essentiels</h2>' +
       '<span class="count">' + nDone + '/' + ess.length + '</span></div>' + bar(nDone, ess.length) +
-      ess.map(function (it) { return check('day-check', it.id, it.label, !!d.checks[it.id]); }).join('') + '</section>';
+      ess.map(function (it) { return check(it.todo ? 'day-todo' : 'day-check', it.id, it.label, it.done); }).join('') +
+      (missing > 0 ? '<p class="hint">Ta to-do est vide : ajoute ' + (missing > 1 ? '1 ou 2 tâches' : 'une tâche') +
+        ' pour la journée. <button type="button" class="inline-link" data-act="tab" data-tab="todo">Ouvrir la to-do</button></p>' : '') +
+      '</section>';
     html += rewardCard(state, k);
-    if (day.bonus.length) {
+    if (bonus.length) {
       html += '<section class="block"><div class="block-head"><h2 class="block-title">Bonus</h2></div>' +
-        day.bonus.map(function (it) { return check('day-check', it.id, it.label, !!d.checks[it.id]); }).join('') + '</section>';
+        bonus.map(function (it) { return check('day-check', it.id, it.label, !!d.checks[it.id]); }).join('') + '</section>';
     }
     html += '<button type="button" class="link" data-act="toggle-deroule" aria-expanded="' + !!ctx.ui.deroule + '">' +
       (ctx.ui.deroule ? '▾' : '▸') + ' Déroulé de la journée</button>';
     if (ctx.ui.deroule) {
-      html += '<section class="block"><ol class="timeline">' + Cap.deroule(k, state.settings).map(function (r) {
+      html += '<section class="block"><ol class="timeline">' + Cap.deroule(k, state.settings, Cap.isRendu(state)).map(function (r) {
         return '<li><time>' + esc(r.time) + '</time><span>' + esc(r.label) + '</span></li>';
       }).join('') + '</ol></section>';
     }
@@ -1501,7 +1579,12 @@ var Cap = (function () {
 
     return '<h1 class="page-title">🧭 Cap</h1>' +
       '<p class="page-sub">Le jour affiché change les couleurs et l’écran JOUR.</p>' +
-      chips + anchors + settings + close + content + rules;
+      chips + anchors + settings + close +
+      (state.rapportRendu ? '<section class="block"><div class="block-head"><h2 class="block-title">📨 Rapport rendu</h2></div>' +
+        '<p class="hint">Le ' + esc(longDate(state.rapportRendu)) + '. L’onglet Rapport et les sessions de rapport sont masqués ; ' +
+        'ta to-do remplit les journées.</p>' +
+        '<button type="button" class="btn ghost" data-act="rapport-undo">Annuler : remettre le rapport</button></section>' : '') +
+      content + rules;
   }
 
   Cap.views = {
@@ -1589,13 +1672,17 @@ var Cap = (function () {
     var y = window.scrollY;
     var c = ctx();
     renderedDay = Cap.dateToStr(c.today);
-    var day = Cap.DAYS[Cap.activeDay(state, c.today)];
+    var k = Cap.activeDay(state, c.today);
+    // Une fois le rapport rendu, la journée retient ses tâches de to-do (stables même cochées).
+    if (Cap.syncTodoPicks(state, k)) Cap.save(state);
+    var tab = Cap.currentTab(state);
+    var day = Cap.DAYS[k];
     var rs = document.documentElement.style;
     rs.setProperty('--day', day.c1);
     rs.setProperty('--day2', day.c2);
     if (themeMeta) themeMeta.setAttribute('content', day.c1);
     root.innerHTML = safe(function () { return Cap.views.header(state, c); }, 'L’en-tête') +
-      safe(function () { return Cap.views[state.tab](state, c); }, 'Cet onglet');
+      safe(function () { return Cap.views[tab](state, c); }, 'Cet onglet');
     nav.innerHTML = safe(function () { return Cap.views.tabbar(state); }, 'La barre d’onglets');
     window.scrollTo(0, y);
   }
@@ -1717,7 +1804,7 @@ var Cap = (function () {
     switch (act) {
       case 'tab':
         var t = el.getAttribute('data-tab');
-        if (Cap.TABS.indexOf(t) >= 0 && t !== state.tab) { state.tab = t; Cap.save(state); render(); window.scrollTo(0, 0); }
+        if (Cap.visibleTabs(state).indexOf(t) >= 0 && t !== Cap.currentTab(state)) { state.tab = t; Cap.save(state); render(); window.scrollTo(0, 0); }
         return;
       case 'amorce-start':
         Cap.startAmorce(state, el.getAttribute('data-slot') === 'prep' ? 'prep' : k, c.now);
@@ -1828,8 +1915,15 @@ var Cap = (function () {
         ui.todoUndo = null;
         commit();
         return;
+      case 'day-todo':
+        var wasDone = Cap.essentialsDone(state, k);
+        Cap.toggleTodo(state, el.getAttribute('data-id'), c.now);
+        commit();
+        if (!wasDone && Cap.essentialsDone(state, k)) confetti();
+        return;
       case 'rapport-rendu':
         Cap.setRapportRendu(state, c.today);
+        state.tab = 'jour';      // l'onglet Rapport disparaît
         commit();
         window.scrollTo(0, 0);
         confetti();

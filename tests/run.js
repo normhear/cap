@@ -611,6 +611,95 @@ function suite() {
     eq(s.rapportRendu, '');
     eq(Cap.normalize({ rapportRendu: 'hier' }).rapportRendu, '');
   });
+  // ----- Après le rendu du rapport -----
+
+  function reportDay() {
+    var ks = ['lun', 'mar', 'mer', 'jeu', 'ven'].filter(function (k) {
+      return Cap.DAYS[k].essentiels.some(function (it) { return it.rapport; });
+    });
+    ok(ks.length, 'au moins un jour a des tâches marquées « rapport »');
+    return ks[0];
+  }
+  function renduState() {
+    var s = base();
+    Cap.setRapportRendu(s, D('2026-10-21'));
+    return s;
+  }
+
+  test('rendu : l’onglet Rapport disparaît, on peut annuler', function () {
+    var s = base();
+    eq(Cap.visibleTabs(s).length, 5);
+    s.tab = 'rapport';
+    Cap.setRapportRendu(s, D('2026-10-21'));
+    ok(Cap.visibleTabs(s).indexOf('rapport') < 0, 'onglet masqué');
+    eq(Cap.currentTab(s), 'jour', 'onglet courant masqué → JOUR');
+    eq(count(Cap.views.tabbar(s), /data-act="tab"/g), 4);
+    var html = viewOk('cap', s, ctxAt(2026, 10, 21));
+    ok(html.indexOf('data-act="rapport-undo"') > 0, 'annuler depuis CAP');
+    Cap.unsetRapportRendu(s);
+    eq(Cap.visibleTabs(s).length, 5);
+    eq(Cap.currentTab(s), 'rapport');
+  });
+  test('rendu : les tâches « rapport » disparaissent de JOUR', function () {
+    var k = reportDay(), before = base(), after = renduState();
+    eq(Cap.dayEssentials(before, k).length, Cap.DAYS[k].essentiels.length, 'avant : tout est là');
+    eq(Cap.todoSlots(before, k), 0, 'avant : pas de place pour la to-do');
+    var kept = Cap.DAYS[k].essentiels.filter(function (it) { return !it.rapport; });
+    eq(Cap.dayEssentials(after, k).map(function (it) { return it.id; }), kept.map(function (it) { return it.id; }), 'après, to-do vide');
+    ok(Cap.todoSlots(after, k) >= 1);
+    ok(Cap.dayBonus(after, k).every(function (it) { return !it.rapport; }), 'bonus filtrés');
+    ok(Cap.deroule(k, after.settings, true).length <= Cap.deroule(k, after.settings, false).length, 'déroulé filtré');
+    var rows = Cap.DAYS[k].deroule.filter(function (r) { return r[2] === 'rapport'; }).length;
+    eq(Cap.deroule(k, after.settings, true).length, Cap.DAYS[k].deroule.length - rows);
+    if (Cap.DAYS[k].amorceApres) eq(Cap.dayAmorce(after, k), Cap.DAYS[k].amorceApres);
+    eq(Cap.dayAmorce(before, k), Cap.DAYS[k].amorce);
+    Cap.startAmorce(after, k, 1);
+    ok(viewOk('jour', (after.selectedDay = k, after), ctxAt(2026, 10, 21)).indexOf('Ta to-do est vide') > 0, 'invite à remplir la to-do');
+  });
+  test('rendu : la to-do remplit les essentiels, deux au plus', function () {
+    var k = reportDay(), s = renduState();
+    ['Un', 'Deux', 'Trois'].forEach(function (t, i) { Cap.addTodo(s, t, 100 + i); });
+    Cap.syncTodoPicks(s, k);
+    var ess = Cap.dayEssentials(s, k);
+    ok(ess.length <= 2, 'deux essentiels au plus');
+    var todos = ess.filter(function (it) { return it.todo; });
+    eq(todos.length, Cap.todoSlots(s, k));
+    eq(todos.map(function (it) { return it.label; }), ['Un', 'Deux'].slice(0, todos.length), 'les premières tâches à faire');
+    ok(!Cap.rewardUnlocked(s, k));
+    // On coche tout : la récompense se débloque, et les tâches cochées restent dans la journée.
+    ess.forEach(function (it) { if (it.todo) Cap.toggleTodo(s, it.id, 500); else Cap.toggleDayCheck(s, k, it.id); });
+    Cap.syncTodoPicks(s, k);
+    ok(Cap.rewardUnlocked(s, k), 'récompense débloquée');
+    eq(Cap.dayEssentials(s, k).filter(function (it) { return it.todo; }).map(function (it) { return it.label; }),
+      todos.map(function (it) { return it.label; }), 'tâches faites gardées pour la journée');
+    // Supprimer une tâche retenue libère sa place pour la suivante.
+    Cap.removeTodo(s, todos[0].id);
+    Cap.syncTodoPicks(s, k);
+    var nextOpen = s.todos.filter(function (t) { return !t.done; })[0];
+    ok(Cap.dayEssentials(s, k).some(function (it) { return it.id === nextOpen.id; }), 'remplacée par la première tâche à faire');
+    ok(Cap.dayEssentials(s, k).every(function (it) { return it.id !== todos[0].id; }), 'la tâche supprimée a disparu');
+    var c = ctxAt(2026, 10, 21);
+    s.selectedDay = k; Cap.startAmorce(s, k, c.now);
+    ok(viewOk('jour', s, c).indexOf('data-act="day-todo"') > 0, 'cochable depuis JOUR');
+    Cap.closeWeek(s);
+    eq(s.week[k].todoPicks, [], 'clore la semaine libère les choix');
+  });
+  test('rendu : un jour sans tâche « rapport » ne change pas', function () {
+    var s = renduState();
+    ['lun', 'mar', 'mer', 'jeu', 'ven'].forEach(function (k) {
+      if (Cap.DAYS[k].essentiels.some(function (it) { return it.rapport; })) return;
+      eq(Cap.todoSlots(s, k), 0, k);
+      eq(Cap.dayEssentials(s, k).length, Cap.DAYS[k].essentiels.length, k);
+    });
+    eq(Cap.syncTodoPicks(s, 'we'), false);
+  });
+  test('normalize : choix de to-do abîmés', function () {
+    var s = Cap.normalize({ week: { mar: { todoPicks: ['a', 'a', 5, 'mauvais id !', 'b', 'c'] }, mer: { todoPicks: 'x' } } });
+    eq(s.week.mar.todoPicks, ['a', 'b']);
+    eq(s.week.mer.todoPicks, []);
+    assertValidState(s);
+  });
+
   test('Matrice : toutes les vues × états × dates', function () {
     var states = [base(), Cap.normalize(null), Cap.normalize({ settings: { phase: 'B' } })];
     var full = base();
@@ -628,6 +717,11 @@ function suite() {
     full.openRule = Cap.RULES[Cap.RULES.length - 1].id;
     full.selectedDay = 'mer';
     states.push(full);
+    var rendu = base();
+    Cap.setRapportRendu(rendu, D('2026-10-21'));
+    Cap.addTodo(rendu, 'Première', 1); Cap.addTodo(rendu, '<b>Deuxième</b>', 2);
+    Cap.DAY_KEYS.forEach(function (k) { Cap.startAmorce(rendu, k, 1); Cap.syncTodoPicks(rendu, k); });
+    states.push(rendu);
     var dates = [[2026, 10, 1], [2026, 10, 3], [2026, 10, 14], [2026, 10, 15], [2026, 10, 19], [2026, 12, 1], [2026, 12, 25]];
     states.forEach(function (s) {
       dates.forEach(function (d) {
@@ -672,6 +766,17 @@ function contentTests() {
     eq(r.content.days.we.essentiels, [], 'rien le week-end');
     ok(r.warnings.length >= 4, 'avertissements');
     assertValidContent(r.content);
+  });
+  test('normalizeContent : drapeau « rapport », amorce après rendu, déroulé', function () {
+    var r = Cap.normalizeContent({ days: { mar: {
+      amorceApres: 'Après', essentiels: [{ id: 'x1', label: 'X', rapport: true }, { id: 'x2', label: 'Y', rapport: 'oui' }],
+      deroule: [['=w', 'A', 'rapport'], ['=c', 'B', 'autre']]
+    } } });
+    var mar = r.content.days.mar;
+    eq(mar.amorceApres, 'Après');
+    eq(mar.essentiels, [{ id: 'x1', label: 'X', rapport: true }, { id: 'x2', label: 'Y' }], 'seul true compte');
+    eq(mar.deroule, [['=w', 'A', 'rapport'], ['=c', 'B']]);
+    eq(r.content.days.we.amorceApres, '');
   });
   test('parseContentText : refus clairs', function () {
     eq(Cap.parseContentText('pas du json').ok, false);
