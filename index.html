@@ -41,7 +41,7 @@ body {
 #app {
   max-width: 540px;
   margin: 0 auto;
-  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(150px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
 }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 input, textarea { font: inherit; font-size: 16px; color: inherit; }
@@ -214,6 +214,36 @@ svg, .deco, .tick, .ico { pointer-events: none; }
 .inline-link { font-weight: 600; color: var(--day); text-decoration: underline; padding: 4px 2px; }
 .banner-body { flex: 1; min-width: 0; }
 .banner-link { flex: none; color: #fff; font-size: 14px; font-weight: 600; text-decoration: underline; padding: 8px 4px; position: relative; }
+/* Minuteur */
+.hero-link { color: #fff; opacity: .9; font-size: 14px; text-decoration: underline; padding: 6px 10px; margin-top: -6px; }
+.go.long { font-size: 34px; }
+.fab {
+  position: fixed; z-index: 20; right: calc(16px + env(safe-area-inset-right)); bottom: calc(84px + env(safe-area-inset-bottom));
+  min-width: 52px; height: 52px; padding: 0 14px; border-radius: 99px; font-size: 20px; font-weight: 700;
+  font-family: var(--font-title); font-variant-numeric: tabular-nums;
+  background: var(--card); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 6px 20px rgba(0,0,0,.14);
+}
+.fab.on { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--day), var(--day2)); font-size: 17px; }
+.fab.ring { animation: pulse 1.2s ease-in-out infinite; }
+@media (min-width: 572px) { .fab { right: calc(50% - 270px + 16px); } }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.4); }
+.sheet {
+  position: fixed; z-index: 31; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 540px;
+  max-height: 88vh; overflow-y: auto; background: var(--card); border-radius: 24px 24px 0 0;
+  padding: 18px calc(16px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  box-shadow: 0 -10px 40px rgba(0,0,0,.2);
+}
+.sheet-time { margin: 4px 0 2px; text-align: center; font-family: var(--font-title); font-weight: 700; font-size: 56px; color: var(--day); font-variant-numeric: tabular-nums; }
+.sheet-sub { margin: 0 0 10px; text-align: center; color: var(--muted); }
+.sheet-h { margin: 14px 0 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.chip.day { --c1: var(--day); --c2: var(--day2); }
+.set.free { margin-bottom: 4px; }
+.sound-row { display: flex; align-items: center; gap: 8px; }
+.sound-row + .sound-row { border-top: 1px solid var(--line); }
+.sound-row .check { flex: 1; }
+.row.center { justify-content: center; }
+.btn.big { min-height: 56px; padding: 12px 28px; font-size: 17px; }
+@media (prefers-reduced-motion: reduce) { .fab.ring { animation: none; } }
 .file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 label.btn { position: relative; cursor: pointer; }
 label.btn:focus-within { outline: 3px solid var(--day); outline-offset: 2px; }
@@ -255,6 +285,7 @@ label.btn:focus-within { outline: 3px solid var(--day); outline-offset: 2px; }
 <body>
 <main id="app"></main>
 <nav id="tabs" class="tabs" aria-label="Onglets"></nav>
+<div id="overlay"></div>
 
 <script>
 /*CORE-START*/
@@ -267,7 +298,15 @@ var Cap = (function () {
   var TABS = ['jour', 'rapport', 'boulot', 'todo', 'cap'];
   var TODO_MAX = 200;
   var DAY_KEYS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'we'];
-  var AMORCE_SECONDS = 5 * 60;
+  var AMORCE_SECONDS = 5 * 60;           // durée par défaut du minuteur
+  var TIMER_PRESETS = [5, 15, 25, 45, 60];
+  var TIMER_SOUNDS = [
+    { id: 'bol', label: 'Bol tibétain', ico: '🥣' },
+    { id: 'carillon', label: 'Carillon', ico: '🔔' },
+    { id: 'bip', label: 'Bip doux', ico: '🎵' },
+    { id: 'vibre', label: 'Vibration seule', ico: '📳' }
+  ];
+  var RING_GRACE = 60 * 1000;            // au-delà, un minuteur fini pendant l'absence se termine sans sonner
   var LEVER_STEP = 30;
   var OLD_DATE = '2000-01-01';
 
@@ -568,7 +607,9 @@ var Cap = (function () {
         fermeture: CONTENT.settings.fermeture,
         finStage: CONTENT.settings.finStage,
         rendu: CONTENT.settings.rendu,
-        phase: 'auto'              // 'auto' | 'A' | 'B'
+        phase: 'auto',             // 'auto' | 'A' | 'B'
+        timerMinutes: 5,           // dernière durée choisie
+        timerSound: 'bol'          // dernier son choisi
       },
       week: week,
       rewards: rewards,
@@ -581,7 +622,9 @@ var Cap = (function () {
       todos: [],                   // [{ id, text, done, at, doneAt }] dans l'ordre d'ajout
       rapportRendu: '',            // 'AAAA-MM-JJ' quand le rapport est rendu
       openRule: '',
-      weeksClosed: 0
+      weeksClosed: 0,
+      // Minuteur unique. slot : '' (libre), un jour ou 'prep' quand il sert d'amorce.
+      timer: { status: 'idle', endsAt: 0, left: 0, duration: 0, slot: '' }
     };
   }
 
@@ -644,6 +687,8 @@ var Cap = (function () {
     d.finStage = toDate(has(s, 'finStage') ? s.finStage : s.fin, d.finStage);
     d.rendu = toDate(s.rendu, d.rendu);
     d.phase = ['auto', 'A', 'B'].indexOf(s.phase) >= 0 ? s.phase : 'auto';
+    d.timerMinutes = toInt(s.timerMinutes, d.timerMinutes, 1, 180);
+    d.timerSound = TIMER_SOUNDS.some(function (x) { return x.id === s.timerSound; }) ? s.timerSound : d.timerSound;
 
     var wk = isObj(src.week) ? src.week : {};
     DAY_KEYS.forEach(function (k) { out.week[k] = normDay(wk[k], k); });
@@ -696,6 +741,18 @@ var Cap = (function () {
     out.openRule = RULES.some(function (r) { return r.id === src.openRule; }) ? src.openRule : '';
     out.weeksClosed = toInt(src.weeksClosed, 0, 0, 999);
     out.rapportRendu = toDate(src.rapportRendu, '');
+    if (isObj(src.timer)) {
+      var tm = src.timer, ot = out.timer;
+      ot.duration = toInt(tm.duration, 0, 0, 180 * 60);
+      ot.endsAt = toInt(tm.endsAt, 0, 0);
+      ot.left = toInt(tm.left, 0, 0, 180 * 60);
+      ot.slot = DAY_KEYS.indexOf(tm.slot) >= 0 || tm.slot === 'prep' ? tm.slot : '';
+      var st = ['running', 'paused', 'ringing'].indexOf(tm.status) >= 0 ? tm.status : 'idle';
+      // Un minuteur incohérent repart à zéro plutôt que de rester bloqué.
+      if ((st === 'running' && !ot.endsAt) || (st === 'paused' && !ot.left) || !ot.duration) st = 'idle';
+      ot.status = st;
+      if (st === 'idle') out.timer = defaults().timer;
+    }
 
     // To-do : tolère une liste de simples textes (format hérité) ; ignore le reste.
     if (Array.isArray(src.todos)) {
@@ -1040,17 +1097,20 @@ var Cap = (function () {
     return state.prepAmorce.date === t ? state.prepAmorce : { date: t, amorce: 'idle', startedAt: 0 };
   }
   function amorceStatus(state, k, now) { return slotFor(state, k, now).amorce; }
+  // Lance l'amorce avec la durée choisie : c'est le minuteur unique qui compte.
   function startAmorce(state, k, now) {
     var s = slotFor(state, k, now);
-    if (s.amorce === 'idle') { s.amorce = 'running'; s.startedAt = now; }
+    if (s.amorce !== 'idle') return state;
+    s.amorce = 'running'; s.startedAt = now;
     if (k === 'prep') state.prepAmorce = s;
+    startTimer(state, now, k);
     return state;
   }
-  // Secondes restantes du chrono (0 si fini ou non lancé).
+  // Secondes restantes du chrono de l'amorce (0 si fini ou non lancé).
   function amorceRemaining(state, k, now) {
     var s = slotFor(state, k, now);
-    if (s.amorce !== 'running') return 0;
-    return Math.max(0, AMORCE_SECONDS - Math.floor((now - s.startedAt) / 1000));
+    if (s.amorce !== 'running' || state.timer.slot !== k) return 0;
+    return timerRemaining(state, now);
   }
   function finishAmorce(state, k, now) {
     var s = slotFor(state, k, now);
@@ -1061,11 +1121,69 @@ var Cap = (function () {
   // Termine en silence les chronos expirés (par exemple après une nuit). Renvoie true si quelque chose a changé.
   function expireAmorces(state, now) {
     var changed = false;
+    var t = state.timer;
+    // Minuteur fini depuis longtemps (une nuit, par exemple) : on le termine sans sonner.
+    if ((t.status === 'running' && now - t.endsAt >= RING_GRACE) || (t.status === 'ringing' && now - t.endsAt >= RING_GRACE)) {
+      stopTimer(state, now);
+      changed = true;
+    }
     DAY_KEYS.concat(['prep']).forEach(function (k) {
       var s = k === 'prep' ? state.prepAmorce : state.week[k];
-      if (s.amorce === 'running' && now - s.startedAt >= AMORCE_SECONDS * 1000) { s.amorce = 'done'; changed = true; }
+      var linked = state.timer.status !== 'idle' && state.timer.slot === k;
+      if (s.amorce === 'running' && !linked) { s.amorce = 'done'; changed = true; }
     });
     return changed;
+  }
+
+  // ---------- Minuteur ----------
+
+  function timerRemaining(state, now) {
+    var t = state.timer;
+    if (t.status === 'running') return Math.max(0, Math.ceil((t.endsAt - now) / 1000));
+    if (t.status === 'paused') return t.left;
+    return 0;
+  }
+  // slot : '' pour un minuteur libre, ou l'amorce qu'il chronomètre.
+  function startTimer(state, now, slot) {
+    var dur = state.settings.timerMinutes * 60;
+    state.timer = { status: 'running', endsAt: now + dur * 1000, left: 0, duration: dur, slot: slot || '' };
+    return state;
+  }
+  function pauseTimer(state, now) {
+    var t = state.timer;
+    if (t.status === 'running') { t.left = Math.max(1, timerRemaining(state, now)); t.status = 'paused'; t.endsAt = 0; }
+    return state;
+  }
+  function resumeTimer(state, now) {
+    var t = state.timer;
+    if (t.status === 'paused') { t.endsAt = now + t.left * 1000; t.left = 0; t.status = 'running'; }
+    return state;
+  }
+  // Arrêter : l'amorce reliée compte comme faite (avoir démarré suffit).
+  function stopTimer(state, now) {
+    var slot = state.timer.slot;
+    if (slot && amorceStatus(state, slot, now) === 'running') finishAmorce(state, slot, now);
+    state.timer = { status: 'idle', endsAt: 0, left: 0, duration: 0, slot: '' };
+    return state;
+  }
+  // À appeler chaque seconde. Renvoie true au moment où le temps est écoulé.
+  function tickTimer(state, now) {
+    var t = state.timer;
+    if (t.status !== 'running' || now < t.endsAt) return false;
+    t.status = 'ringing';
+    if (t.slot && amorceStatus(state, t.slot, now) === 'running') finishAmorce(state, t.slot, now);
+    return true;
+  }
+  function setTimerMinutes(state, m) {
+    var n = toInt(m, NaN, 1, 180);
+    if (!isFinite(n)) return false;
+    state.settings.timerMinutes = n;
+    return true;
+  }
+  function setTimerSound(state, id) {
+    if (!TIMER_SOUNDS.some(function (x) { return x.id === id; })) return false;
+    state.settings.timerSound = id;
+    return true;
   }
   function toggleAnchor(state, k, which) {
     if (DAY_KEYS.indexOf(k) < 0 || (which !== 'lever' && which !== 'fermeture')) return state;
@@ -1196,6 +1314,9 @@ var Cap = (function () {
 
   return {
     STORAGE_KEY: STORAGE_KEY, CONTENT_KEY: CONTENT_KEY, TABS: TABS, DAY_KEYS: DAY_KEYS, AMORCE_SECONDS: AMORCE_SECONDS,
+    TIMER_PRESETS: TIMER_PRESETS, TIMER_SOUNDS: TIMER_SOUNDS, RING_GRACE: RING_GRACE,
+    timerRemaining: timerRemaining, startTimer: startTimer, pauseTimer: pauseTimer, resumeTimer: resumeTimer,
+    stopTimer: stopTimer, tickTimer: tickTimer, setTimerMinutes: setTimerMinutes, setTimerSound: setTimerSound,
     RAPPORT: RAPPORT, INTERVIEW: INTERVIEW, INTERVIEW_GENERIC: INTERVIEW_GENERIC, SAMPLE: SAMPLE,
     // Contenu actif : lu à chaque accès, pour suivre setContent().
     get CONTENT() { return CONTENT; },
@@ -1264,19 +1385,24 @@ var Cap = (function () {
     return '<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done +
       '"><i style="width:' + pct + '%"></i></div>';
   }
-  function hero(emoji, lieu, amorce, slot) {
+  function hero(emoji, lieu, amorce, slot, minutes) {
+    var m = minutes || 5;
     return '<section class="hero">' +
       '<div class="hero-emoji" aria-hidden="true">' + esc(emoji) + '</div>' +
       (lieu ? '<p class="hero-lieu">' + esc(lieu) + '</p>' : '') +
       '<h1 class="hero-amorce">' + esc(amorce) + '</h1>' +
-      '<button type="button" class="go" data-act="amorce-start" data-slot="' + slot + '" aria-label="Lancer 5 minutes">5:00</button>' +
+      '<button type="button" class="go' + (m >= 100 ? ' long' : '') + '" data-act="amorce-start" data-slot="' + slot +
+      '" aria-label="Lancer ' + m + ' minutes">' + m + ':00</button>' +
       '<p class="hero-contract">Après, tu as le droit d’arrêter.</p>' +
+      '<button type="button" class="hero-link" data-act="timer-open">changer la durée</button>' +
       '</section>';
   }
   function banner(state, slot, emoji, amorce, now) {
     var status = Cap.amorceStatus(state, slot, now);
+    var paused = state.timer.slot === slot && state.timer.status === 'paused';
     var sub = status === 'running'
-      ? '<span class="timer" data-timer="' + slot + '">' + clock(Cap.amorceRemaining(state, slot, now)) + '</span> · après, tu as le droit d’arrêter'
+      ? '<span class="timer" data-timer="' + slot + '">' + clock(Cap.amorceRemaining(state, slot, now)) + '</span>' +
+        (paused ? ' · en pause' : ' · après, tu as le droit d’arrêter')
       : 'Amorce faite ✓';
     return '<section class="banner"><span class="banner-emoji" aria-hidden="true">' + esc(emoji) + '</span>' +
       '<div><p class="banner-amorce">' + esc(amorce) + '</p><p class="banner-sub">' + sub + '</p></div></section>';
@@ -1330,7 +1456,7 @@ var Cap = (function () {
         '<p class="hero-text">' + esc(Cap.CONTENT.prepDone) + '</p></section>' + note;
     }
     var status = Cap.amorceStatus(state, 'prep', ctx.now);
-    if (status === 'idle' && !doneTonight) return hero(day.emoji, 'Ce soir, une seule chose', next.label, 'prep');
+    if (status === 'idle' && !doneTonight) return hero(day.emoji, 'Ce soir, une seule chose', next.label, 'prep', state.settings.timerMinutes);
 
     var item = doneTonight || next;
     return (status === 'idle' ? '' : banner(state, 'prep', day.emoji, item.label, ctx.now)) +
@@ -1354,7 +1480,7 @@ var Cap = (function () {
   function dayView(state, ctx, k) {
     var day = Cap.DAYS[k], d = state.week[k];
     var amorce = Cap.dayAmorce(state, k);
-    if (d.amorce === 'idle') return hero(day.emoji, day.lieu, amorce, k);
+    if (d.amorce === 'idle') return hero(day.emoji, day.lieu, amorce, k, state.settings.timerMinutes);
 
     var ess = Cap.dayEssentials(state, k);
     var bonus = Cap.dayBonus(state, k);
@@ -1506,6 +1632,64 @@ var Cap = (function () {
     return html;
   }
 
+  // ----- MINUTEUR (bouton flottant et panneau, visibles sur tous les onglets) -----
+
+  function timerFab(state, ctx) {
+    var t = state.timer, left = Cap.timerRemaining(state, ctx.now);
+    var label = t.status === 'ringing' ? '🔔' : t.status === 'idle' ? '⏱' : '⏱ <span data-timer="fab">' + clock(left) + '</span>';
+    return '<button type="button" class="fab' + (t.status === 'idle' ? '' : ' on') + (t.status === 'ringing' ? ' ring' : '') +
+      '" data-act="timer-open" aria-label="Minuteur' + (t.status === 'idle' ? '' : ' : ' + clock(left) + ' restant') + '">' + label + '</button>';
+  }
+
+  function timerPanel(state, ctx) {
+    var ui = ctx.ui || {}, t = state.timer, s = state.settings;
+    if (!ui.timerOpen && t.status !== 'ringing') return '';
+    var html = '<div class="sheet-backdrop" data-act="timer-close" aria-hidden="true"></div>' +
+      '<section class="sheet" role="dialog" aria-modal="true" aria-label="Minuteur">' +
+      '<div class="block-head"><h2 class="block-title">⏱ Minuteur</h2>' +
+      (t.status === 'ringing' ? '' : '<button type="button" class="del" data-act="timer-close" aria-label="Fermer"><span class="ico" aria-hidden="true">✕</span></button>') +
+      '</div>';
+
+    if (t.status === 'ringing') {
+      return html + '<p class="sheet-time">0:00</p><p class="sheet-sub">Temps écoulé. Tu as le droit d’arrêter.</p>' +
+        '<div class="row center"><button type="button" class="btn big" data-act="timer-dismiss">Arrêter la sonnerie</button></div></section>';
+    }
+    if (t.status === 'running' || t.status === 'paused') {
+      return html + '<p class="sheet-time" data-timer="sheet">' + clock(Cap.timerRemaining(state, ctx.now)) + '</p>' +
+        '<p class="sheet-sub">' + (t.slot ? 'Amorce' : 'Minuteur') + ' de ' + Math.round(t.duration / 60) + ' min' +
+        (t.status === 'paused' ? ' · en pause' : '') + '</p>' +
+        '<div class="row center">' +
+        (t.status === 'running'
+          ? '<button type="button" class="btn" data-act="timer-pause">Pause</button>'
+          : '<button type="button" class="btn" data-act="timer-resume">Reprendre</button>') +
+        '<button type="button" class="btn ghost" data-act="timer-stop">Arrêter</button></div></section>';
+    }
+
+    var isPreset = Cap.TIMER_PRESETS.indexOf(s.timerMinutes) >= 0;
+    var free = ui.timerFree || !isPreset;
+    html += '<p class="sheet-time">' + s.timerMinutes + ':00</p>' +
+      '<h3 class="sheet-h">Durée</h3><div class="chips">' +
+      Cap.TIMER_PRESETS.map(function (m) {
+        var on = !free && s.timerMinutes === m;
+        return '<button type="button" class="chip day' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on +
+          '" data-act="timer-min" data-min="' + m + '">' + m + ' min</button>';
+      }).join('') +
+      '<button type="button" class="chip day' + (free ? ' on' : '') + '" role="radio" aria-checked="' + free + '" data-act="timer-free-toggle">Libre</button></div>' +
+      (free ? '<label class="set free"><span>Minutes (1 à 180)</span><input class="field" type="number" inputmode="numeric" min="1" max="180" step="1" data-act="timer-free" value="' +
+        s.timerMinutes + '"></label>' : '') +
+      '<h3 class="sheet-h">Son de fin</h3><div class="sounds">' +
+      Cap.TIMER_SOUNDS.map(function (x) {
+        var on = s.timerSound === x.id;
+        return '<div class="sound-row">' +
+          '<button type="button" class="check' + (on ? ' on' : '') + '" role="radio" aria-checked="' + on + '" data-act="timer-sound" data-sound="' + x.id + '">' +
+          '<span class="box">' + TICK + '</span><span class="lbl">' + x.ico + ' ' + esc(x.label) + '</span></button>' +
+          '<button type="button" class="inline-link" data-act="timer-preview" data-sound="' + x.id + '">écouter</button></div>';
+      }).join('') + '</div>' +
+      '<p class="hint">Garde Cap ouvert : téléphone verrouillé, la sonnerie peut ne pas partir.</p>' +
+      '<div class="row center"><button type="button" class="btn big" data-act="timer-start">Lancer ' + s.timerMinutes + ' min</button></div></section>';
+    return html;
+  }
+
   // ----- CAP -----
 
   function capView(state, ctx) {
@@ -1592,7 +1776,9 @@ var Cap = (function () {
     rapport: rapport,
     boulot: boulot,
     todo: todo,
-    cap: capView
+    cap: capView,
+    timerFab: timerFab,
+    timerPanel: timerPanel
   };
 })(Cap);
 /*VIEWS-END*/
@@ -1606,13 +1792,14 @@ var Cap = (function () {
 
   var root = document.getElementById('app');
   var nav = document.getElementById('tabs');
+  var overlay = document.getElementById('overlay');
   var themeMeta = document.querySelector('meta[name="theme-color"]');
   // Le contenu d'abord : l'état en dépend (identifiants des cases, réglages par défaut).
   var loaded = Cap.loadContent();
   Cap.setContent(loaded.content);
   var contentInfo = { source: loaded.source, importedAt: loaded.importedAt };
   var state = Cap.load();
-  var ui = { deroule: false, draft: '', copyState: '', importMsg: '', todoDraft: '', todoUndo: null };
+  var ui = { deroule: false, draft: '', copyState: '', importMsg: '', todoDraft: '', todoUndo: null, timerOpen: false, timerFree: false };
   var copyToken = 0, importToken = 0, undoToken = 0;
   var CONFETTI_COLORS = Cap.DAY_KEYS.reduce(function (a, k) { return a.concat([Cap.DAYS[k].c1, Cap.DAYS[k].c2]); }, []);
 
@@ -1684,6 +1871,7 @@ var Cap = (function () {
     root.innerHTML = safe(function () { return Cap.views.header(state, c); }, 'L’en-tête') +
       safe(function () { return Cap.views[tab](state, c); }, 'Cet onglet');
     nav.innerHTML = safe(function () { return Cap.views.tabbar(state); }, 'La barre d’onglets');
+    overlay.innerHTML = safe(function () { return Cap.views.timerFab(state, c) + Cap.views.timerPanel(state, c); }, 'Le minuteur');
     window.scrollTo(0, y);
   }
 
@@ -1743,9 +1931,89 @@ var Cap = (function () {
     } catch (err) { /* lecture vocale indisponible : rien à faire */ }
   }
 
+  // ---------- Sons du minuteur : fabriqués dans la page, sans fichier ni réseau ----------
+  var audio = null;
+  // À appeler pendant un toucher : les navigateurs n'autorisent le son qu'après un geste.
+  function unlockAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!audio) audio = new AC();
+      if (audio.state === 'suspended') audio.resume();
+    } catch (err) { audio = null; }
+    return audio;
+  }
+  function tone(ac, freq, start, dur, type, gain) {
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.exponentialRampToValueAtTime(gain, start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(start); o.stop(start + dur + 0.05);
+  }
+  function vibrate() {
+    try { if (navigator.vibrate) navigator.vibrate([400, 200, 400, 200, 400]); } catch (err) { /* rien */ }
+  }
+  function playSound(id) {
+    if (id === 'vibre') { vibrate(); return; }
+    var ac = unlockAudio();
+    if (!ac) { vibrate(); return; }
+    try {
+      var t = ac.currentTime + 0.05;
+      if (id === 'bol') {
+        tone(ac, 220, t, 4.5, 'sine', 0.35); tone(ac, 607, t, 3, 'sine', 0.12); tone(ac, 1188, t, 1.6, 'sine', 0.05);
+      } else if (id === 'carillon') {
+        [1046.5, 784, 659.3].forEach(function (f, i) { tone(ac, f, t + i * 0.45, 1.8, 'triangle', 0.25); });
+      } else {
+        tone(ac, 880, t, 0.18, 'sine', 0.2); tone(ac, 880, t + 0.3, 0.18, 'sine', 0.2);
+      }
+    } catch (err) { vibrate(); }
+  }
+  var ringTimer = null;
+  function startRinging() {
+    stopRinging();
+    var id = state.settings.timerSound, n = 0;
+    function once() {
+      playSound(id);
+      if (id !== 'vibre') vibrate();
+      if (++n >= 3 && ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+    }
+    once();
+    ringTimer = setInterval(once, id === 'bol' ? 4500 : 2500);
+  }
+  function stopRinging() {
+    if (ringTimer) { clearInterval(ringTimer); ringTimer = null; }
+    try { if (navigator.vibrate) navigator.vibrate(0); } catch (err) { /* rien */ }
+  }
+
+  // Écran allumé pendant le minuteur, quand le navigateur le permet. Rien n'attend cette réponse :
+  // si elle n'arrive jamais, le minuteur marche quand même.
+  var wake = null, wakeToken = 0;
+  function requestWake() {
+    var tk = ++wakeToken;
+    try {
+      if (!navigator.wakeLock || document.hidden) return;
+      navigator.wakeLock.request('screen').then(function (lock) {
+        if (tk !== wakeToken || state.timer.status === 'idle') { lock.release(); return; }   // arrivée trop tard
+        wake = lock;
+      }, function () { /* refusé : tant pis */ });
+    } catch (err) { /* indisponible */ }
+  }
+  function releaseWake() {
+    wakeToken++;
+    try { if (wake) wake.release(); } catch (err) { /* rien */ }
+    wake = null;
+  }
+
   function handle(e) {
+    if (e.type === 'keydown') {
+      if (e.key === 'Escape' && ui.timerOpen && state.timer.status !== 'ringing') { ui.timerOpen = false; render(); }
+      return;
+    }
     // Retour sur l'appli : on ne redessine que si la date a changé (le chrono se met à jour seul).
     if (e.type === 'visibilitychange') {
+      if (!document.hidden && state.timer.status === 'running') requestWake();   // le verrou saute quand on quitte l'appli
       if (!document.hidden && Cap.dateToStr(new Date()) !== renderedDay) render();
       return;
     }
@@ -1773,6 +2041,7 @@ var Cap = (function () {
 
     if (e.type === 'change') {
       if (act === 'import-file') { importFile(el.files && el.files[0]); return; }
+      if (act === 'timer-free') { Cap.setTimerMinutes(state, el.value); commit(); return; }
       if (act === 'setting') {
         // Valeur refusée : on redessine quand même pour remettre l'ancienne valeur affichée.
         Cap.setSetting(state, el.getAttribute('data-key'), el.value);
@@ -1807,8 +2076,54 @@ var Cap = (function () {
         if (Cap.visibleTabs(state).indexOf(t) >= 0 && t !== Cap.currentTab(state)) { state.tab = t; Cap.save(state); render(); window.scrollTo(0, 0); }
         return;
       case 'amorce-start':
+        unlockAudio();
+        if (state.timer.status !== 'idle') { stopRinging(); Cap.stopTimer(state, c.now); }   // un seul minuteur à la fois
         Cap.startAmorce(state, el.getAttribute('data-slot') === 'prep' ? 'prep' : k, c.now);
+        requestWake();
         commit(); window.scrollTo(0, 0);
+        return;
+      case 'timer-open':
+        ui.timerOpen = true; render();
+        return;
+      case 'timer-close':
+        if (state.timer.status === 'ringing') return;
+        ui.timerOpen = false; ui.timerFree = false; render();
+        return;
+      case 'timer-min':
+        Cap.setTimerMinutes(state, el.getAttribute('data-min'));
+        ui.timerFree = false;
+        commit();
+        return;
+      case 'timer-free-toggle':
+        ui.timerFree = true; render();
+        var fi = document.querySelector('[data-act="timer-free"]');
+        if (fi) fi.focus();
+        return;
+      case 'timer-sound':
+        Cap.setTimerSound(state, el.getAttribute('data-sound'));
+        commit();
+        return;
+      case 'timer-preview':
+        playSound(el.getAttribute('data-sound'));
+        return;
+      case 'timer-start':
+        unlockAudio();
+        if (state.timer.status !== 'idle') Cap.stopTimer(state, c.now);
+        Cap.startTimer(state, c.now, '');
+        requestWake();
+        commit();
+        return;
+      case 'timer-pause':
+        Cap.pauseTimer(state, c.now); releaseWake(); commit();
+        return;
+      case 'timer-resume':
+        unlockAudio(); Cap.resumeTimer(state, c.now); requestWake(); commit();
+        return;
+      case 'timer-stop':
+        Cap.stopTimer(state, c.now); releaseWake(); ui.timerOpen = false; commit();
+        return;
+      case 'timer-dismiss':
+        stopRinging(); Cap.stopTimer(state, c.now); releaseWake(); ui.timerOpen = false; commit();
         return;
       case 'day-check':
         var before = k === 'we' ? !!state.week.we.checks['we-lever'] : Cap.essentialsDone(state, k);
@@ -1943,26 +2258,26 @@ var Cap = (function () {
     }
   }
 
-  ['click', 'input', 'change', 'submit', 'visibilitychange'].forEach(function (type) { document.addEventListener(type, handle); });
+  ['click', 'input', 'change', 'submit', 'keydown', 'visibilitychange'].forEach(function (type) { document.addEventListener(type, handle); });
 
-  // Chrono : met à jour le texte seulement ; re-rend une fois à la fin.
+  // Minuteur : chaque seconde, met à jour le texte seulement ; re-rend une fois quand le temps est écoulé.
   setInterval(function () {
-    var timers = document.querySelectorAll('[data-timer]');
-    if (!timers.length) return;
     var now = Date.now();
-    for (var i = 0; i < timers.length; i++) {
-      var slot = timers[i].getAttribute('data-timer');
-      var left = Cap.amorceRemaining(state, slot, now);
-      timers[i].textContent = Cap.views.clock(left);
-      if (left === 0 && Cap.amorceStatus(state, slot, now) === 'running') {
-        Cap.finishAmorce(state, slot, now);
-        commit();
-        confetti();
-        return;
-      }
+    if (Cap.tickTimer(state, now)) {
+      var wasAmorce = !!state.timer.slot;
+      Cap.save(state);
+      startRinging();
+      render();
+      if (wasAmorce) confetti();
+      return;
     }
+    if (state.timer.status !== 'running') return;
+    var txt = Cap.views.clock(Cap.timerRemaining(state, now));
+    var els = document.querySelectorAll('[data-timer]');
+    for (var i = 0; i < els.length; i++) els[i].textContent = txt;
   }, 1000);
 
+  if (state.timer.status === 'running') requestWake();   // minuteur en cours à la réouverture
   try { render(); } catch (e) {
     root.textContent = 'Cap n’a pas pu démarrer : ' + (e && e.message);
   }

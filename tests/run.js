@@ -126,6 +126,14 @@ function viewOk(name, state, ctx) {
   return html;
 }
 function count(html, re) { return (html.match(re) || []).length; }
+// Une seule carte, un seul gros bouton ; le seul autre bouton permis est le lien « changer la durée ».
+function assertOneCard(html, where) {
+  where = where ? where + ' : ' : '';
+  eq(count(html, /<section/g), 1, where + 'une seule carte');
+  eq(count(html, /class="go[ "]/g), 1, where + 'un seul gros bouton');
+  eq(count(html, /<button/g), 2, where + 'gros bouton + lien');
+  ok(/data-act="timer-open"/.test(html), where + 'lien changer la durée');
+}
 
 // ---------- La suite, exécutée pour chaque contenu ----------
 
@@ -367,8 +375,14 @@ function suite() {
     var s = base(), t0 = 5000000;
     Cap.startAmorce(s, 'lun', t0);
     eq(Cap.expireAmorces(s, t0 + 1000), false);
-    eq(Cap.expireAmorces(s, t0 + 301000), true);
+    eq(Cap.expireAmorces(s, t0 + 301000), false, 'juste fini : on laisse sonner');
+    eq(Cap.expireAmorces(s, t0 + 300000 + Cap.RING_GRACE), true, 'fini depuis longtemps : terminé sans sonner');
     eq(s.week.lun.amorce, 'done');
+    eq(s.timer.status, 'idle');
+    // Ancien format : amorce « running » sans minuteur → terminée.
+    var old = Cap.normalize({ week: { mar: { amorce: 'running', startedAt: 5 } } });
+    eq(Cap.expireAmorces(old, 10), true);
+    eq(old.week.mar.amorce, 'done');
   });
   test('réglages : valeurs valides et refusées', function () {
     var s = base();
@@ -439,7 +453,7 @@ function suite() {
   });
   test('JOUR phase A : une seule carte, un seul bouton', function () {
     var html = viewOk('jour', base(), ctxAt(2026, 10, 1, 20));
-    eq(count(html, /<button/g), 1, 'un seul bouton');
+    assertOneCard(html);
     ok(html.indexOf(esc(Cap.PREP[0].label)) > 0, 'première tâche affichée');
   });
   test('JOUR phase A : après l’amorce puis la case cochée', function () {
@@ -456,7 +470,7 @@ function suite() {
     Object.keys(dates).forEach(function (k) {
       var s = base(), c = ctxAt(2026, 10, dates[k]);
       var html = viewOk('jour', s, c);
-      eq(count(html, /<button/g), 1, k + ' : un seul bouton avant l’amorce');
+      assertOneCard(html, k);
       ok(html.indexOf(esc(Cap.DAYS[k].amorce)) > 0, k + ' : phrase d’amorce');
       Cap.startAmorce(s, k, c.now);
       html = viewOk('jour', s, c);
@@ -700,6 +714,105 @@ function suite() {
     assertValidState(s);
   });
 
+  // ----- Minuteur -----
+
+  test('minuteur : lancer, pause, reprendre, sonner, arrêter', function () {
+    var s = base(), t0 = 1000000;
+    eq(Cap.timerRemaining(s, t0), 0);
+    ok(Cap.setTimerMinutes(s, 25));
+    Cap.startTimer(s, t0, '');
+    eq(s.timer.status, 'running'); eq(Cap.timerRemaining(s, t0), 1500);
+    eq(Cap.timerRemaining(s, t0 + 60500), 1440, 'arrondi à la seconde supérieure');
+    Cap.pauseTimer(s, t0 + 600000);
+    eq(s.timer.status, 'paused'); eq(Cap.timerRemaining(s, t0 + 9999999), 900, 'en pause, le temps ne file pas');
+    Cap.resumeTimer(s, t0 + 2000000);
+    eq(Cap.timerRemaining(s, t0 + 2000000), 900);
+    eq(Cap.tickTimer(s, t0 + 2000000 + 899000), false);
+    eq(Cap.tickTimer(s, t0 + 2000000 + 900000), true, 'sonne à la fin');
+    eq(s.timer.status, 'ringing');
+    eq(Cap.tickTimer(s, t0 + 2000000 + 901000), false, 'ne sonne qu’une fois');
+    Cap.stopTimer(s, t0);
+    eq(s.timer.status, 'idle');
+    assertValidState(s);
+  });
+  test('minuteur : durées et sons', function () {
+    var s = base();
+    eq(s.settings.timerMinutes, 5, 'par défaut 5 min'); eq(s.settings.timerSound, 'bol');
+    ok(Cap.setTimerMinutes(s, '45')); eq(s.settings.timerMinutes, 45);
+    ok(Cap.setTimerMinutes(s, 500)); eq(s.settings.timerMinutes, 180, 'plafond 180');
+    ok(Cap.setTimerMinutes(s, 0)); eq(s.settings.timerMinutes, 1, 'plancher 1');
+    ok(!Cap.setTimerMinutes(s, 'abc')); ok(!Cap.setTimerMinutes(s, ''));
+    eq(s.settings.timerMinutes, 1);
+    ok(Cap.setTimerSound(s, 'carillon')); ok(!Cap.setTimerSound(s, 'klaxon'));
+    eq(s.settings.timerSound, 'carillon');
+    eq(Cap.TIMER_PRESETS, [5, 15, 25, 45, 60]);
+  });
+  test('amorce avec la durée choisie ; arrêter avant la fin compte comme fait', function () {
+    var s = base(), c = ctxAt(2026, 10, 19), k = 'lun';
+    Cap.setTimerMinutes(s, 15);
+    var html = viewOk('jour', s, c);
+    ok(html.indexOf('>15:00<') > 0 && html.indexOf('Lancer 15 minutes') > 0, 'bouton à 15:00');
+    Cap.startAmorce(s, k, c.now);
+    eq(s.timer.slot, k); eq(Cap.amorceRemaining(s, k, c.now), 900);
+    Cap.pauseTimer(s, c.now + 60000);
+    ok(viewOk('jour', s, c).indexOf('en pause') > 0, 'bandeau en pause');
+    Cap.stopTimer(s, c.now + 61000);
+    eq(s.week[k].amorce, 'done', 'arrêt anticipé : amorce faite');
+    // Jusqu'au bout : l'amorce est faite au moment où ça sonne.
+    var s2 = base();
+    Cap.startAmorce(s2, 'mar', 0);
+    Cap.tickTimer(s2, 300000);
+    eq(s2.week.mar.amorce, 'done'); eq(s2.timer.status, 'ringing');
+    // Amorce du soir (phase A).
+    var s3 = base(), soir = new Date(2026, 9, 1, 20).getTime();
+    Cap.startAmorce(s3, 'prep', soir);
+    eq(s3.timer.slot, 'prep');
+    Cap.stopTimer(s3, soir + 1000);
+    eq(Cap.amorceStatus(s3, 'prep', soir + 1000), 'done');
+  });
+  test('minuteur : vues (bouton, panneau dans chaque état)', function () {
+    var s = base(), c = ctxAt(2026, 10, 19);
+    var fab = Cap.views.timerFab(s, c);
+    assertBalanced(fab); assertClickable(fab);
+    eq(Cap.views.timerPanel(s, c), '', 'fermé par défaut');
+    c.ui.timerOpen = true;
+    var p = Cap.views.timerPanel(s, c);
+    assertBalanced(p); assertClickable(p);
+    eq(count(p, /data-act="timer-min"/g), 5, '5 durées');
+    ok(p.indexOf('data-act="timer-free-toggle"') > 0, 'durée libre');
+    eq(count(p, /data-act="timer-sound"/g), Cap.TIMER_SOUNDS.length, 'sons');
+    eq(count(p, /data-act="timer-preview"/g), Cap.TIMER_SOUNDS.length, 'écouter');
+    ok(p.indexOf('data-act="timer-start"') > 0);
+    Cap.setTimerMinutes(s, 37);
+    p = Cap.views.timerPanel(s, c);
+    ok(p.indexOf('data-act="timer-free"') > 0 && p.indexOf('value="37"') > 0, 'durée libre affichée');
+    Cap.startTimer(s, c.now, '');
+    p = Cap.views.timerPanel(s, c); assertBalanced(p);
+    ok(p.indexOf('data-act="timer-pause"') > 0 && p.indexOf('data-act="timer-stop"') > 0);
+    ok(Cap.views.timerFab(s, c).indexOf('37:00') > 0, 'temps restant sur le bouton');
+    Cap.pauseTimer(s, c.now);
+    ok(Cap.views.timerPanel(s, c).indexOf('data-act="timer-resume"') > 0);
+    Cap.resumeTimer(s, c.now); Cap.tickTimer(s, c.now + 37 * 60000);
+    c.ui.timerOpen = false;
+    p = Cap.views.timerPanel(s, c);
+    ok(p.indexOf('data-act="timer-dismiss"') > 0, 'sonnerie : panneau ouvert même fermé');
+    ok(p.indexOf('data-act="timer-close"') > 0 ? p.indexOf('aria-label="Fermer"') < 0 : true, 'pas de croix pendant la sonnerie');
+    assertBalanced(p);
+    ok(Cap.views.timerFab(s, c).indexOf('ring') > 0);
+  });
+  test('normalize : minuteur abîmé ou incohérent', function () {
+    [null, 'x', { status: 'running' }, { status: 'paused', duration: 60 }, { status: 'volé', duration: 60, endsAt: 5 }].forEach(function (t) {
+      var s = Cap.normalize({ timer: t });
+      eq(s.timer, Cap.defaults().timer, JSON.stringify(t));
+    });
+    var ok1 = Cap.normalize({ timer: { status: 'running', endsAt: 123, duration: 300, slot: 'mar' } });
+    eq(ok1.timer, { status: 'running', endsAt: 123, left: 0, duration: 300, slot: 'mar' });
+    eq(Cap.normalize({ timer: { status: 'paused', left: 50, duration: 300, slot: 'zzz' } }).timer.slot, '');
+    var s = Cap.normalize({ settings: { timerMinutes: 'beaucoup', timerSound: 'klaxon' } });
+    eq(s.settings.timerMinutes, 5); eq(s.settings.timerSound, 'bol');
+    eq(Cap.normalize({ settings: { timerMinutes: '25' } }).settings.timerMinutes, 25);
+  });
+
   test('Matrice : toutes les vues × états × dates', function () {
     var states = [base(), Cap.normalize(null), Cap.normalize({ settings: { phase: 'B' } })];
     var full = base();
@@ -726,6 +839,8 @@ function suite() {
     states.forEach(function (s) {
       dates.forEach(function (d) {
         Cap.TABS.forEach(function (v) { viewOk(v, s, ctxAt(d[0], d[1], d[2])); });
+        var tc = ctxAt(d[0], d[1], d[2]); tc.ui.timerOpen = true;
+        assertBalanced(Cap.views.timerFab(s, tc) + Cap.views.timerPanel(s, tc));
         assertBalanced(Cap.views.header(s, ctxAt(d[0], d[1], d[2])));
       });
     });
