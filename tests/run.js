@@ -435,7 +435,7 @@ function suite() {
     assertBalanced(Cap.views.header(s, ctxAt(2026, 10, 1)));
     var tb = Cap.views.tabbar(s);
     assertBalanced(tb); assertClickable(tb);
-    eq(count(tb, /data-act="tab"/g), 4);
+    eq(count(tb, /data-act="tab"/g), 5);
   });
   test('JOUR phase A : une seule carte, un seul bouton', function () {
     var html = viewOk('jour', base(), ctxAt(2026, 10, 1, 20));
@@ -527,7 +527,91 @@ function suite() {
     s.selectedDay = 'we';
     eq(count(viewOk('cap', s, c), /data-act="anchor"/g), 1, 'week-end : seulement le lever');
   });
-  test('Matrice : 4 vues × états × dates', function () {
+  test('to-do : ajouter, cocher, supprimer, annuler', function () {
+    var s = base();
+    ok(!Cap.addTodo(s, '   ', 1), 'texte vide refusé');
+    ok(!Cap.addTodo(s, null, 1), 'null refusé');
+    ok(Cap.addTodo(s, '  Appeler la banque  ', 1000));
+    ok(Cap.addTodo(s, 'Deuxième', 1000), 'même instant : identifiant différent');
+    ok(Cap.addTodo(s, 'Troisième', 2000));
+    eq(s.todos.map(function (t) { return t.text; }), ['Appeler la banque', 'Deuxième', 'Troisième']);
+    eq(new Set(s.todos.map(function (t) { return t.id; })).size, 3, 'identifiants uniques');
+    var a = s.todos[0].id, b = s.todos[1].id, c = s.todos[2].id;
+    Cap.toggleTodo(s, a, 5000);
+    Cap.toggleTodo(s, c, 6000);
+    var l = Cap.sortedTodos(s);
+    eq(l.open.map(function (t) { return t.id; }), [b], 'à faire');
+    eq(l.done.map(function (t) { return t.id; }), [c, a], 'faites : la plus récente en premier');
+    Cap.toggleTodo(s, a, 7000);
+    eq(Cap.sortedTodos(s).open.map(function (t) { return t.id; }), [a, b], 'décochée : reprend sa place d’origine');
+    var removed = Cap.removeTodo(s, b);
+    eq(removed.index, 1); eq(s.todos.length, 2);
+    eq(Cap.removeTodo(s, 'inconnu'), null);
+    Cap.restoreTodo(s, removed);
+    eq(s.todos.map(function (t) { return t.id; }), [a, b, c], 'annuler : remise à sa place');
+    Cap.restoreTodo(s, removed);
+    eq(s.todos.length, 3, 'pas de doublon si on annule deux fois');
+    Cap.closeWeek(s);
+    eq(s.todos.length, 3, 'clore la semaine garde la to-do');
+    assertValidState(s);
+  });
+  test('to-do : limite et texte trop long', function () {
+    var s = base();
+    for (var i = 0; i < Cap.TODO_MAX; i++) Cap.addTodo(s, 'x' + i, i);
+    ok(!Cap.addTodo(s, 'de trop', 999999), 'liste pleine');
+    var s2 = base();
+    Cap.addTodo(s2, new Array(500).join('a'), 1);
+    eq(s2.todos[0].text.length, 300);
+  });
+  test('normalize : to-do abîmée ou ancienne', function () {
+    var s = Cap.normalize({ todos: [
+      'Ancien format texte', { text: '  Ok  ', done: 'true', at: '5', doneAt: 9 }, { text: '' }, { text: 5 }, null,
+      { id: 'dup', text: 'A' }, { id: 'dup', text: 'B' }, { id: 'mauvais id !', text: 'C', done: false, doneAt: 77 }
+    ] });
+    assertValidState(s);
+    eq(s.todos.map(function (t) { return t.text; }), ['Ancien format texte', 'Ok', 'A', 'B', 'C']);
+    eq(s.todos[1], { id: 'old1', text: 'Ok', done: true, at: 5, doneAt: 9 });
+    eq(new Set(s.todos.map(function (t) { return t.id; })).size, 5, 'identifiants uniques');
+    eq(s.todos[4].doneAt, 0, 'pas faite : doneAt à 0');
+    eq(Cap.normalize({ todos: 'x' }).todos, []);
+    eq(Cap.normalize({ todos: new Array(500).join('t,').split(',') }).todos.length, Cap.TODO_MAX);
+  });
+  test('TO-DO : vue vide, remplie, avec annulation, texte échappé', function () {
+    var s = base(), c = ctxAt(2026, 10, 21);
+    var html = viewOk('todo', s, c);
+    ok(html.indexOf('data-act="todo-add"') > 0 && html.indexOf('data-act="todo-draft"') > 0, 'formulaire');
+    ok(html.indexOf('Rien pour l’instant') > 0, 'état vide');
+    Cap.addTodo(s, '<img src=x onerror=alert(1)>', 1);
+    Cap.addTodo(s, 'Deux', 2);
+    Cap.toggleTodo(s, s.todos[1].id, 3);
+    html = viewOk('todo', s, c);
+    ok(html.indexOf('<img') < 0, 'texte échappé');
+    eq(count(html, /data-act="todo-check"/g), 2);
+    eq(count(html, /data-act="todo-del"/g), 2);
+    ok(html.indexOf('Faites') > html.indexOf('À faire'), 'faites en bas');
+    ok(/class="check on"[\s\S]*Deux/.test(html.slice(html.indexOf('Faites'))), 'faite cochée, en bas');
+    c.ui.todoUndo = { item: { id: 'z', text: 'z' }, index: 0 };
+    ok(viewOk('todo', s, c).indexOf('data-act="todo-undo"') > 0, 'lien annuler');
+  });
+  test('rapport rendu : coche les 9 étapes, bandeau, annulation', function () {
+    var s = base(), c = ctxAt(2026, 10, 21);
+    var html = viewOk('rapport', s, c);
+    ok(html.indexOf('data-act="rapport-rendu"') > 0, 'bouton');
+    ok(html.indexOf('Rapport rendu') < 0, 'pas de bandeau avant');
+    Cap.setRapportRendu(s, c.today);
+    eq(s.rapportRendu, '2026-10-21');
+    ok(Cap.RAPPORT.every(function (r) { return s.rapport[r.id]; }), '9 étapes cochées');
+    html = viewOk('rapport', s, c);
+    ok(html.indexOf('Rapport rendu') > 0 && html.indexOf('mercredi 21 octobre') > 0, 'bandeau daté');
+    ok(html.indexOf('data-act="rapport-rendu"') < 0, 'bouton masqué');
+    ok(html.indexOf('data-act="rapport-undo"') > 0, 'annuler');
+    ok(html.indexOf('data-act="interview-start"') > 0, 'interview toujours là');
+    assertValidState(s);
+    Cap.unsetRapportRendu(s);
+    eq(s.rapportRendu, '');
+    eq(Cap.normalize({ rapportRendu: 'hier' }).rapportRendu, '');
+  });
+  test('Matrice : toutes les vues × états × dates', function () {
     var states = [base(), Cap.normalize(null), Cap.normalize({ settings: { phase: 'B' } })];
     var full = base();
     Cap.DAY_KEYS.forEach(function (k) {
@@ -539,6 +623,8 @@ function suite() {
     Cap.RAPPORT.forEach(function (r) { full.rapport[r.id] = true; });
     Cap.JOBS.forEach(function (j) { full.jobs[j.id] = true; });
     full.interview.title = 'Remerciements';
+    Cap.addTodo(full, 'Une tâche', 10); Cap.addTodo(full, 'Une autre', 20); Cap.toggleTodo(full, full.todos[0].id, 30);
+    Cap.setRapportRendu(full, D('2026-10-21'));
     full.openRule = Cap.RULES[Cap.RULES.length - 1].id;
     full.selectedDay = 'mer';
     states.push(full);

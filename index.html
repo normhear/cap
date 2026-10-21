@@ -203,6 +203,17 @@ svg, .deco, .tick, .ico { pointer-events: none; }
 .set { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); min-width: 0; }
 .set .field { color: var(--ink); font-weight: 500; padding: 10px 12px; min-height: 46px; -webkit-appearance: none; appearance: none; }
 .set:last-child { grid-column: 1 / -1; }
+.todo-form { display: flex; gap: 10px; align-items: center; padding: 12px; }
+.todo-form .field { flex: 1; min-width: 0; }
+.todo-row { display: flex; align-items: center; gap: 4px; }
+.todo-row + .todo-row { border-top: 1px solid var(--line); }
+.todo-row .check { flex: 1; min-width: 0; }
+.todo-row .lbl { overflow-wrap: anywhere; }
+.del { flex: none; width: 44px; height: 44px; border-radius: 50%; color: var(--muted); display: grid; place-items: center; }
+.del .ico { font-size: 15px; }
+.inline-link { font-weight: 600; color: var(--day); text-decoration: underline; padding: 4px 2px; }
+.banner-body { flex: 1; min-width: 0; }
+.banner-link { flex: none; color: #fff; font-size: 14px; font-weight: 600; text-decoration: underline; padding: 8px 4px; position: relative; }
 .file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 label.btn { position: relative; cursor: pointer; }
 label.btn:focus-within { outline: 3px solid var(--day); outline-offset: 2px; }
@@ -253,7 +264,8 @@ var Cap = (function () {
   'use strict';
 
   var STORAGE_KEY = 'cap_v1';
-  var TABS = ['jour', 'rapport', 'boulot', 'cap'];
+  var TABS = ['jour', 'rapport', 'boulot', 'todo', 'cap'];
+  var TODO_MAX = 200;
   var DAY_KEYS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'we'];
   var AMORCE_SECONDS = 5 * 60;
   var LEVER_STEP = 30;
@@ -562,6 +574,8 @@ var Cap = (function () {
       jobs: {},
       counters: counters,
       interview: { title: '', answers: ['', '', '', '', '', '', ''] },
+      todos: [],                   // [{ id, text, done, at, doneAt }] dans l'ordre d'ajout
+      rapportRendu: '',            // 'AAAA-MM-JJ' quand le rapport est rendu
       openRule: '',
       weeksClosed: 0
     };
@@ -672,6 +686,22 @@ var Cap = (function () {
 
     out.openRule = RULES.some(function (r) { return r.id === src.openRule; }) ? src.openRule : '';
     out.weeksClosed = toInt(src.weeksClosed, 0, 0, 999);
+    out.rapportRendu = toDate(src.rapportRendu, '');
+
+    // To-do : tolère une liste de simples textes (format hérité) ; ignore le reste.
+    if (Array.isArray(src.todos)) {
+      var seenTodo = {};
+      src.todos.slice(0, TODO_MAX).forEach(function (t, i) {
+        if (typeof t === 'string') t = { text: t };
+        if (!isObj(t) || typeof t.text !== 'string' || !t.text.trim()) return;
+        var id = typeof t.id === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(t.id) && !seenTodo[t.id] ? t.id : 'old' + i;
+        if (seenTodo[id]) return;
+        seenTodo[id] = true;
+        var done = toBool(t.done);
+        out.todos.push({ id: id, text: t.text.trim().slice(0, 300), done: done,
+          at: toInt(t.at, 0, 0), doneAt: done ? toInt(t.doneAt, 0, 0) : 0 });
+      });
+    }
     return out;
   }
 
@@ -1005,7 +1035,60 @@ var Cap = (function () {
     if (has(state.counters, id)) state.counters[id] = Math.max(0, Math.min(9999, state.counters[id] + delta));
     return state;
   }
-  // Clore la semaine : décoche la semaine, lever +30 min (plafonné), garde le reste.
+  // ---------- To-do ----------
+
+  // Ajoute une tâche. Renvoie false si le texte est vide ou la liste pleine.
+  function addTodo(state, text, now) {
+    var t = String(text == null ? '' : text).trim().slice(0, 300);
+    if (!t || state.todos.length >= TODO_MAX) return false;
+    var base = 't' + Math.floor(now).toString(36), id = base, n = 1;
+    while (state.todos.some(function (x) { return x.id === id; })) id = base + '-' + (n++);
+    state.todos.push({ id: id, text: t, done: false, at: now, doneAt: 0 });
+    return true;
+  }
+  function findTodo(state, id) {
+    for (var i = 0; i < state.todos.length; i++) if (state.todos[i].id === id) return i;
+    return -1;
+  }
+  function toggleTodo(state, id, now) {
+    var i = findTodo(state, id);
+    if (i < 0) return state;
+    var t = state.todos[i];
+    t.done = !t.done;
+    t.doneAt = t.done ? now : 0;
+    return state;
+  }
+  // Supprime et renvoie { item, index } pour pouvoir annuler, ou null.
+  function removeTodo(state, id) {
+    var i = findTodo(state, id);
+    if (i < 0) return null;
+    return { item: state.todos.splice(i, 1)[0], index: i };
+  }
+  function restoreTodo(state, removed) {
+    if (!removed || !removed.item || findTodo(state, removed.item.id) >= 0) return state;
+    state.todos.splice(Math.min(removed.index, state.todos.length), 0, removed.item);
+    return state;
+  }
+  // À faire d'abord (ordre d'ajout), puis faites (la plus récente en premier).
+  function sortedTodos(state) {
+    var open = state.todos.filter(function (t) { return !t.done; });
+    var done = state.todos.filter(function (t) { return t.done; }).sort(function (a, b) { return b.doneAt - a.doneAt; });
+    return { open: open, done: done };
+  }
+
+  // ---------- Rapport rendu ----------
+
+  function setRapportRendu(state, today) {
+    state.rapportRendu = dateToStr(today);
+    RAPPORT.forEach(function (r) { state.rapport[r.id] = true; });
+    return state;
+  }
+  function unsetRapportRendu(state) {
+    state.rapportRendu = '';
+    return state;
+  }
+
+  // Clore la semaine : décoche la semaine, lever +30 min (plafonné), garde le reste (to-do comprise).
   function closeWeek(state) {
     DAY_KEYS.forEach(function (k) { state.week[k] = emptyDay(); });
     var s = state.settings;
@@ -1066,6 +1149,9 @@ var Cap = (function () {
     amorceStatus: amorceStatus, startAmorce: startAmorce, amorceRemaining: amorceRemaining,
     finishAmorce: finishAmorce, expireAmorces: expireAmorces, bumpCounter: bumpCounter, closeWeek: closeWeek,
     toggleAnchor: toggleAnchor, setSetting: setSetting, selectDay: selectDay, LEVER_STEP: LEVER_STEP,
+    TODO_MAX: TODO_MAX, addTodo: addTodo, toggleTodo: toggleTodo, removeTodo: removeTodo,
+    restoreTodo: restoreTodo, sortedTodos: sortedTodos,
+    setRapportRendu: setRapportRendu, unsetRapportRendu: unsetRapportRendu,
     toggleRapport: function (state, id) { toggleIn(state.rapport, ids(RAPPORT), id); return state; },
     toggleJob: function (state, id) { toggleIn(state.jobs, ids(JOBS), id); return state; },
     interviewFor: interviewFor, interviewText: interviewText
@@ -1085,6 +1171,7 @@ var Cap = (function () {
     jour: { ico: '☀️', label: 'JOUR' },
     rapport: { ico: '📄', label: 'RAPPORT' },
     boulot: { ico: '🎯', label: 'BOULOT' },
+    todo: { ico: '✅', label: 'TO-DO' },
     cap: { ico: '🧭', label: 'CAP' }
   };
   var TICK = '<svg class="tick" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
@@ -1277,9 +1364,16 @@ var Cap = (function () {
   function rapport(state, ctx) {
     var s = state.settings;
     var n = Cap.daysUntil(s.rendu, ctx.today);
-    return '<h1 class="page-title">📄 Rapport</h1>' +
-      '<p class="page-sub">Rendu ' + esc(longDate(s.rendu)) + (n >= 0 ? ' · J–' + n : '') + '. Tu ne rédiges pas, tu réponds à des questions.</p>' +
-      checklist('La méthode', 'rapport-check', Cap.RAPPORT, state.rapport) +
+    var rendu = state.rapportRendu
+      ? '<section class="banner"><span class="banner-emoji" aria-hidden="true">📨</span>' +
+        '<div class="banner-body"><p class="banner-amorce">Rapport rendu 🎉</p><p class="banner-sub">Le ' + esc(longDate(state.rapportRendu)) + '. C’est fait.</p></div>' +
+        '<button type="button" class="banner-link" data-act="rapport-undo">Annuler</button></section>'
+      : '';
+    var done = state.rapportRendu ? '' :
+      '<div class="row"><button type="button" class="btn" data-act="rapport-rendu">J’ai rendu le rapport ✓</button></div>';
+    return '<h1 class="page-title">📄 Rapport</h1>' + rendu +
+      (state.rapportRendu ? '' : '<p class="page-sub">Rendu ' + esc(longDate(s.rendu)) + (n >= 0 ? ' · J–' + n : '') + '. Tu ne rédiges pas, tu réponds à des questions.</p>') +
+      checklist('La méthode', 'rapport-check', Cap.RAPPORT, state.rapport) + done +
       interview(state, ctx.ui || {});
   }
 
@@ -1298,6 +1392,40 @@ var Cap = (function () {
     return '<h1 class="page-title">🎯 Boulot</h1>' +
       '<p class="page-sub">' + esc(Cap.CONTENT.jobsIntro) + '</p>' +
       counters + checklist('Les outils à préparer', 'job-check', Cap.JOBS, state.jobs);
+  }
+
+  // ----- TO-DO -----
+
+  function todoRow(t) {
+    return '<div class="todo-row">' + check('todo-check', t.id, t.text, t.done) +
+      '<button type="button" class="del" data-act="todo-del" data-id="' + esc(t.id) + '" aria-label="Supprimer : ' + esc(t.text) + '">' +
+      '<span class="ico" aria-hidden="true">✕</span></button></div>';
+  }
+
+  function todo(state, ctx) {
+    var ui = ctx.ui || {};
+    var lists = Cap.sortedTodos(state);
+    var html = '<h1 class="page-title">✅ To-do</h1>' +
+      '<p class="page-sub">Ce que tu notes ici reste sur cet appareil.</p>' +
+      '<form class="block todo-form" data-act="todo-add">' +
+      '<input class="field" data-act="todo-draft" maxlength="300" placeholder="Une tâche…" value="' + esc(ui.todoDraft || '') +
+      '" aria-label="Nouvelle tâche" enterkeyhint="done">' +
+      '<button type="submit" class="btn">Ajouter</button></form>';
+    if (ui.todoUndo) {
+      html += '<p class="msg undo" role="status">Tâche supprimée. ' +
+        '<button type="button" class="inline-link" data-act="todo-undo">Annuler</button></p>';
+    }
+    if (!lists.open.length && !lists.done.length) {
+      return html + '<p class="note">Rien pour l’instant. Une tâche à la fois.</p>';
+    }
+    html += '<section class="block"><div class="block-head"><h2 class="block-title">À faire</h2>' +
+      '<span class="count">' + lists.open.length + '</span></div>' +
+      (lists.open.length ? lists.open.map(todoRow).join('') : '<p class="hint">Tout est fait.</p>') + '</section>';
+    if (lists.done.length) {
+      html += '<section class="block"><div class="block-head"><h2 class="block-title">Faites</h2>' +
+        '<span class="count">' + lists.done.length + '</span></div>' + lists.done.map(todoRow).join('') + '</section>';
+    }
+    return html;
   }
 
   // ----- CAP -----
@@ -1380,6 +1508,7 @@ var Cap = (function () {
     esc: esc, clock: clock, header: header, tabbar: tabbar, jour: jour,
     rapport: rapport,
     boulot: boulot,
+    todo: todo,
     cap: capView
   };
 })(Cap);
@@ -1400,8 +1529,8 @@ var Cap = (function () {
   Cap.setContent(loaded.content);
   var contentInfo = { source: loaded.source, importedAt: loaded.importedAt };
   var state = Cap.load();
-  var ui = { deroule: false, draft: '', copyState: '', importMsg: '' };
-  var copyToken = 0, importToken = 0;
+  var ui = { deroule: false, draft: '', copyState: '', importMsg: '', todoDraft: '', todoUndo: null };
+  var copyToken = 0, importToken = 0, undoToken = 0;
   var CONFETTI_COLORS = Cap.DAY_KEYS.reduce(function (a, k) { return a.concat([Cap.DAYS[k].c1, Cap.DAYS[k].c2]); }, []);
 
   if (Cap.expireAmorces(state, Date.now())) Cap.save(state);
@@ -1546,6 +1675,8 @@ var Cap = (function () {
         if (state.rewards.hasOwnProperty(d)) { state.rewards[d] = el.value.slice(0, 120); Cap.save(state); }
       } else if (act === 'interview-draft') {
         ui.draft = el.value;
+      } else if (act === 'todo-draft') {
+        ui.todoDraft = el.value;
       } else if (act === 'interview-answer') {
         var i = Number(el.getAttribute('data-i'));
         if (i >= 0 && i < 7) { state.interview.answers[i] = el.value.slice(0, 5000); Cap.save(state); }
@@ -1565,6 +1696,13 @@ var Cap = (function () {
 
     if (e.type === 'submit') {
       e.preventDefault();
+      if (act === 'todo-add') {
+        if (Cap.addTodo(state, ui.todoDraft, c.now)) { ui.todoDraft = ''; ui.todoUndo = null; commit(); }
+        // On garde le clavier ouvert pour enchaîner les tâches.
+        var f = document.querySelector('[data-act="todo-draft"]');
+        if (f) f.focus();
+        return;
+      }
       if (act === 'interview-start') {
         var title = (ui.draft || '').trim();
         if (!title) { var f = el.querySelector('input'); if (f) f.focus(); return; }
@@ -1664,6 +1802,40 @@ var Cap = (function () {
         Cap.applyContentSettings(state);
         state = Cap.normalize(state);
         ui.importMsg = 'Contenu d’exemple rétabli.';
+        commit();
+        return;
+      case 'todo-check':
+        Cap.toggleTodo(state, el.getAttribute('data-id'), c.now);
+        commit();
+        return;
+      case 'todo-del':
+        var removed = Cap.removeTodo(state, el.getAttribute('data-id'));
+        if (!removed) return;
+        var ut = ++undoToken;
+        ui.todoUndo = removed;
+        commit();
+        // Le lien « Annuler » disparaît seul ; on retire juste l'élément, sans redessiner (le clavier reste ouvert).
+        setTimeout(function () {
+          if (ut !== undoToken) return;
+          ui.todoUndo = null;
+          var u = document.querySelector('.undo');
+          if (u && u.parentNode) u.parentNode.removeChild(u);
+        }, 6000);
+        return;
+      case 'todo-undo':
+        undoToken++;
+        Cap.restoreTodo(state, ui.todoUndo);
+        ui.todoUndo = null;
+        commit();
+        return;
+      case 'rapport-rendu':
+        Cap.setRapportRendu(state, c.today);
+        commit();
+        window.scrollTo(0, 0);
+        confetti();
+        return;
+      case 'rapport-undo':
+        Cap.unsetRapportRendu(state);
         commit();
         return;
       case 'interview-reset':
